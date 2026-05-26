@@ -12,7 +12,6 @@
   - `interest_crawler_daily.py`
   - `interest_crawler_main.py`
   - `interest_price.py`
-  - `interest_price_oneday.py`
   - `interest_marketbreadth.py`
   - `interest_foreignindex.py`
   - `interest_macroeconomic.py`
@@ -40,15 +39,11 @@
   - `interest_data_validate_daily.py`
   - `interest_data_validate_all.py`
   - `interest_price_check.py`
-  - `check_yfinance.py`
 - KRX/Selenium/Chrome 관련 후보
   - `interest_krx_chrome.py`
-  - `interest_krx_login.py`
   - `interest_krx_login_new.py`
-  - `get_krx_datas.py`
   - `interest_program.py`
   - `interest_program_history.py`
-  - `interest_program_missing.py`
   - `interest_shortsell.py`
   - `interest_shortsell_history.py`
 - universe/sector 구성 후보
@@ -56,16 +51,10 @@
   - `build_sector_mapping.py`
   - `build_universe_sector.py`
 - legacy 또는 로컬 실험 후보
-  - `agency.py`
-  - `ticker.py`
-  - `news_raw.py`
-  - `news_raw_naverapi.py`
   - `dump_public_schema_final.py`
   - `block_watch_backtest_run.py`
-  - `[--min-final-score`
-  - `[--max-intraday-range`
 
-`test`, `debug`, HTML dump, 임시 파일처럼 보이는 파일은 운영 소스로 단정하지 않고 후보 또는 로컬 산출물로만 취급한다.
+`test`, `debug`, HTML dump, 임시 파일처럼 보이는 로컬 산출물은 1차 정리에서 제거했다. 이후 새로 생성되는 임시 산출물은 운영 소스로 단정하지 않고 별도 후보로 취급한다.
 
 ## 주요 기능
 
