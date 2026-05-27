@@ -94,7 +94,8 @@ DB 접속정보는 `db_config.py`의 `get_db_config()`에서 `INTEREST_DB_*` 환
 | --- | --- | --- |
 | `INTEREST_DB_HOST` | `localhost` | PostgreSQL host |
 | `INTEREST_DB_PORT` | `5433` | PostgreSQL port |
-| `INTEREST_DB_NAME` | `interest_crawler` | PostgreSQL database name |
+| `INTEREST_DB_NAME` | `portfolio` | PostgreSQL database name |
+| `PORTFOLIO_DB_NAME` | `portfolio` | portfolio system shared PostgreSQL database name. `INTEREST_DB_NAME`을 우선 사용하지 않는 환경에서도 같은 기본값을 사용한다. |
 | `INTEREST_DB_USER` | `postgres` | PostgreSQL user |
 | `INTEREST_DB_PASSWORD` | 없음 | PostgreSQL password. 비어 있으면 실행 시 `RuntimeError`가 발생한다. |
 
@@ -103,10 +104,24 @@ PowerShell 설정 예시:
 ```powershell
 $env:INTEREST_DB_HOST="localhost"
 $env:INTEREST_DB_PORT="5433"
-$env:INTEREST_DB_NAME="interest_crawler"
+$env:INTEREST_DB_NAME="portfolio"
 $env:INTEREST_DB_USER="postgres"
 $env:INTEREST_DB_PASSWORD="[REDACTED]"
 ```
+
+### PostgreSQL schema
+
+로컬 PostgreSQL 기본 DB name은 `portfolio`다. AWS Migration 준비 관점에서도 여러 DB로 분리하지 않고 단일 DB `portfolio` 안에서 domain별 schema를 나누는 구조를 사용한다.
+
+현재 portfolio system schema는 `reference`, `interest`, `preprocessor`, `research`, `decision`, `execution`, `connector`, `ops`, `legacy`, `public`로 구분한다. 이 모듈은 interest 수집 모듈이므로 DB connection의 `search_path`를 다음 순서로 사용한다.
+
+```sql
+interest, reference, legacy, public
+```
+
+`public`에 있던 interest 관련 테이블은 domain schema로 이동되었지만, 이 모듈의 기존 SQL은 대부분 schema qualifier 없이 작성되어 있다. 따라서 connection `search_path`를 통해 기존 SQL이 `interest` schema를 우선 조회하고, 공통 참조 테이블은 `reference`, 이전 호환 대상은 `legacy` 순서로 해석되도록 유지한다.
+
+자세한 DB 구조와 문서화 기준은 `docs/database.md`를 참고한다.
 
 주요 설정 유형:
 

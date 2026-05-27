@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## Unreleased
+
+### Added
+
+- `docs/database.md`에 portfolio 단일 DB와 schema-per-domain 구조, interest 모듈 `search_path` 기준을 추가했다.
+
+### Changed
+
+- DB name 기본값을 `portfolio`로 문서화하고 `INTEREST_DB_NAME`, `PORTFOLIO_DB_NAME` 설명을 같은 기본값 기준으로 정리했다.
+- schema-per-domain 전환 후에도 기존 SQL이 `interest, reference, legacy, public` search_path 기반으로 동작한다는 설명을 추가했다.
+- AWS Migration 준비 관점에서 단일 DB `portfolio` 안의 domain schema 구조를 사용한다고 명시했다.
+- 민감정보는 환경변수 또는 로컬 설정으로 관리하고 실제 password/token/account/webhook 값은 문서에 기록하지 않는 기준을 보강했다.
+
 ## 2026-05-27
 
 ### Changed
