@@ -3,6 +3,7 @@ import glob
 import time
 import pandas as pd
 import psycopg2
+from db_config import get_db_config
 from psycopg2.extras import execute_batch
 
 from selenium import webdriver
@@ -25,13 +26,7 @@ CSV_WAIT = 7
 SOURCE = "krx"
 VERSION = "2.0.0"
 
-DB_CONFIG = {
-    "host": "localhost",
-    "port": 5433,
-    "dbname": "interest_crawler",
-    "user": "postgres",
-    "password": "doflwhsk3768!"
-}
+DB_CONFIG = get_db_config()
 
 
 # ---------------------------

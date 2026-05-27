@@ -7,6 +7,7 @@ from selenium.webdriver.support import expected_conditions as EC
 
 from bs4 import BeautifulSoup
 import psycopg2
+from db_config import get_db_config
 import re
 import json
 from datetime import date
@@ -15,13 +16,7 @@ from datetime import date
 # 설정
 # =========================================
 
-DB_CONFIG = {
-    "host": "localhost",
-    "port": 5433,
-    "dbname": "interest_crawler",
-    "user": "postgres",
-    "password": "doflwhsk3768!"
-}
+DB_CONFIG = get_db_config()
 
 TICKER_CODE = "005380"
 

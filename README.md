@@ -86,6 +86,28 @@ validation/check 스크립트도 DB 연결 또는 외부 요청이 포함될 수
 
 민감정보는 코드, 문서, 로그, 예시 출력에 기록하지 않는다. 필요한 값은 환경변수 또는 local config로 분리하고 문서에는 `[REDACTED]`로 마스킹한다.
 
+### DB 접속 환경변수
+
+DB 접속정보는 `db_config.py`의 `get_db_config()`에서 `INTEREST_DB_*` 환경변수로 읽는다. 각 스크립트는 기존처럼 단독 실행할 수 있지만, 실행 전에 `INTEREST_DB_PASSWORD`는 반드시 설정해야 한다.
+
+| 환경변수 | 기본값 | 설명 |
+| --- | --- | --- |
+| `INTEREST_DB_HOST` | `localhost` | PostgreSQL host |
+| `INTEREST_DB_PORT` | `5433` | PostgreSQL port |
+| `INTEREST_DB_NAME` | `interest_crawler` | PostgreSQL database name |
+| `INTEREST_DB_USER` | `postgres` | PostgreSQL user |
+| `INTEREST_DB_PASSWORD` | 없음 | PostgreSQL password. 비어 있으면 실행 시 `RuntimeError`가 발생한다. |
+
+PowerShell 설정 예시:
+
+```powershell
+$env:INTEREST_DB_HOST="localhost"
+$env:INTEREST_DB_PORT="5433"
+$env:INTEREST_DB_NAME="interest_crawler"
+$env:INTEREST_DB_USER="postgres"
+$env:INTEREST_DB_PASSWORD="[REDACTED]"
+```
+
 주요 설정 유형:
 
 - PostgreSQL host, port, database, user, password

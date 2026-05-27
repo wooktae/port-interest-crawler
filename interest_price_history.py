@@ -1,16 +1,11 @@
 import yfinance as yf
 import psycopg2
+from db_config import get_db_config
 import json
 import pandas as pd
 from datetime import datetime
 
-DB_CONFIG = {
-    "host": "localhost",
-    "port": 5433,
-    "dbname": "interest_crawler",
-    "user": "postgres",
-    "password": "doflwhsk3768!"
-}
+DB_CONFIG = get_db_config()
 
 SOURCE_NAME = "yfinance"
 SOURCE_VERSION = "1.0.0"

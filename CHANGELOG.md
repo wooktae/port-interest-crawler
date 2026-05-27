@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## 2026-05-27
+
+### Changed
+
+- DB 접속정보를 `db_config.py`의 `get_db_config()`로 공통화하고 `INTEREST_DB_*` 환경변수 기반으로 외부화했다.
+- Python 스크립트에 있던 DB password 하드코딩 후보를 제거했다.
+
+### Docs
+
+- README에 `INTEREST_DB_*` 환경변수 설명과 placeholder 기반 설정 예시를 추가했다.
+
+### Notes
+
+- 실제 DB 접속, 크롤링, 외부 API 호출, Selenium/Chrome 실행, 주문 실행은 수행하지 않았다.
+
 ## 2026-05-26
 
 ### Changed

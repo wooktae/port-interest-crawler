@@ -3,6 +3,7 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 import psycopg2
+from db_config import get_db_config
 import time
 import re
 from datetime import datetime
@@ -10,13 +11,7 @@ from datetime import datetime
 # ----------------------------
 # DB 설정
 # ----------------------------
-DB_CONFIG = {
-    "host": "localhost",
-    "port": 5433,
-    "dbname": "interest_crawler",
-    "user": "postgres",
-    "password": "doflwhsk3768!"
-}
+DB_CONFIG = get_db_config()
 
 # ----------------------------
 # URL

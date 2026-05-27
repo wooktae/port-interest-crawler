@@ -1,16 +1,11 @@
 import psycopg2
+from db_config import get_db_config
 from datetime import datetime, timedelta
 
 from interest_get_holidays import is_holiday
 
 
-DB_CONFIG = {
-    "host": "localhost",
-    "port": 5433,
-    "dbname": "interest_crawler",
-    "user": "postgres",
-    "password": "doflwhsk3768!"
-}
+DB_CONFIG = get_db_config()
 
 START_DATE = datetime(2022, 1, 1).date()
 PARTIAL_THRESHOLD = 60

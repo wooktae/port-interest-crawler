@@ -1,6 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 import psycopg2
+from db_config import get_db_config
 import json
 import re
 import time
@@ -10,13 +11,7 @@ from datetime import datetime, timedelta
 from interest_log_format import print_step_log
 
 
-DB_CONFIG = {
-    "host": "localhost",
-    "port": 5433,
-    "dbname": "interest_crawler",
-    "user": "postgres",
-    "password": "doflwhsk3768!"
-}
+DB_CONFIG = get_db_config()
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0"

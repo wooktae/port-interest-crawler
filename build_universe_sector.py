@@ -1,15 +1,10 @@
 import time
 import psycopg2
+from db_config import get_db_config
 import yfinance as yf
 from datetime import datetime, timezone
 
-DB_CONFIG = {
-    "host": "localhost",
-    "port": 5433,
-    "dbname": "interest_crawler",
-    "user": "postgres",
-    "password": "doflwhsk3768!"
-}
+DB_CONFIG = get_db_config()
 
 SLEEP_SEC = 0.25  # 야후 과호출 방지 (필요하면 0.5~1.0로)
 BATCH_COMMIT = 50

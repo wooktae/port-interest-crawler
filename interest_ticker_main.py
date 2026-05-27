@@ -1,17 +1,12 @@
 import requests
 import yfinance as yf
 import psycopg2
+from db_config import get_db_config
 import json
 import time
 from datetime import datetime, timezone
 
-DB_CONFIG = {
-    "host": "localhost",
-    "port": 5433,
-    "dbname": "interest_crawler",
-    "user": "postgres",
-    "password": "doflwhsk3768!"
-}
+DB_CONFIG = get_db_config()
 
 TICKER_CODE = "005380"
 YF_TICKER = "005380.KS"

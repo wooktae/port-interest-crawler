@@ -7,6 +7,7 @@ from decimal import Decimal
 
 import pandas as pd
 import psycopg2
+from db_config import get_db_config
 from psycopg2.extras import execute_batch
 
 from selenium import webdriver
@@ -31,13 +32,7 @@ VERSION = "2.0.0"
 
 SHORTSELL_URL = "https://data.krx.co.kr/contents/MDC/MDI/mdiLoader/index.cmd?menuId=MDC02030201"
 
-DB_CONFIG = {
-    "host": os.getenv("INTEREST_DB_HOST", "localhost"),
-    "port": int(os.getenv("INTEREST_DB_PORT", "5433")),
-    "dbname": os.getenv("INTEREST_DB_NAME", "interest_crawler"),
-    "user": os.getenv("INTEREST_DB_USER", "postgres"),
-    "password": os.getenv("INTEREST_DB_PASSWORD", "")
-}
+DB_CONFIG = get_db_config()
 
 
 def start_debug_chrome():

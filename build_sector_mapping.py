@@ -1,14 +1,9 @@
 import psycopg2
+from db_config import get_db_config
 import yfinance as yf
 import time
 
-DB_CONFIG = {
-    "host": "localhost",
-    "port": 5433,
-    "dbname": "interest_crawler",
-    "user": "postgres",
-    "password": "doflwhsk3768!"
-}
+DB_CONFIG = get_db_config()
 
 
 def get_conn():

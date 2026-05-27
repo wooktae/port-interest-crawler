@@ -3,16 +3,11 @@ import subprocess
 from pathlib import Path
 
 import psycopg2
+from db_config import get_db_config
 from psycopg2 import sql
 
 
-DB_CONFIG = {
-    "host": "localhost",
-    "port": 5433,
-    "dbname": "interest_crawler",
-    "user": "postgres",
-    "password": "doflwhsk3768!"
-}
+DB_CONFIG = get_db_config()
 
 SCHEMA = "public"
 LIMIT = 20

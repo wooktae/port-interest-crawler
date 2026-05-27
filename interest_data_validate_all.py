@@ -1,5 +1,6 @@
 import requests
 import psycopg2
+from db_config import get_db_config
 from psycopg2 import sql
 from datetime import datetime, timedelta, date
 from zoneinfo import ZoneInfo
@@ -8,13 +9,7 @@ from statistics import mean
 # =========================================================
 # CONFIG
 # =========================================================
-DB_CONFIG = {
-    "host": "localhost",
-    "port": 5433,
-    "dbname": "interest_crawler",
-    "user": "postgres",
-    "password": "doflwhsk3768!"
-}
+DB_CONFIG = get_db_config()
 
 SEOUL_TZ = ZoneInfo("Asia/Seoul")
 HOLIDAY_API_BASE = "https://date.nager.at/api/v3/PublicHolidays"
