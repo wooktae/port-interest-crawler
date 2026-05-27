@@ -6,6 +6,7 @@ import contextlib
 import sys
 import os
 from datetime import datetime, timedelta
+import math
 
 from interest_log_format import print_step_log
 
@@ -45,6 +46,39 @@ def suppress_stderr():
         finally:
             sys.stderr = old_stderr
 
+def is_invalid_number(value):
+    if value is None:
+        return True
+
+    try:
+        v = float(value)
+        return math.isnan(v) or math.isinf(v)
+    except Exception:
+        return True
+
+
+def to_safe_float(value):
+    if is_invalid_number(value):
+        return None
+    return round(float(value), 4)
+
+
+def to_json_safe(value):
+    if value is None:
+        return None
+
+    if isinstance(value, float):
+        if math.isnan(value) or math.isinf(value):
+            return None
+        return value
+
+    if isinstance(value, dict):
+        return {k: to_json_safe(v) for k, v in value.items()}
+
+    if isinstance(value, list):
+        return [to_json_safe(v) for v in value]
+
+    return value
 
 def get_conn():
     return psycopg2.connect(**DB_CONFIG)
@@ -131,10 +165,14 @@ def fetch_index_rows(index_name, ticker, start_date, end_date):
             if trade_date >= today:
                 continue
 
-            open_price = round(float(r["Open"]), 4)
-            high_price = round(float(r["High"]), 4)
-            low_price = round(float(r["Low"]), 4)
-            close_price = round(float(r["Close"]), 4)
+            open_price = to_safe_float(r["Open"])
+            high_price = to_safe_float(r["High"])
+            low_price = to_safe_float(r["Low"])
+            close_price = to_safe_float(r["Close"])
+
+            if close_price is None:
+                print(f"[SKIP] {index_name} {trade_date} close_price is invalid")
+                continue
 
             volume = None
 
@@ -148,6 +186,15 @@ def fetch_index_rows(index_name, ticker, start_date, end_date):
 
             now_ts = datetime.now()
 
+            raw_json = to_json_safe({
+                "ticker": ticker,
+                "open": open_price,
+                "high": high_price,
+                "low": low_price,
+                "close": close_price,
+                "volume": volume
+            })
+            
             rows.append({
                 "index_name": index_name,
                 "date": trade_date,
@@ -156,14 +203,7 @@ def fetch_index_rows(index_name, ticker, start_date, end_date):
                 "low_price": low_price,
                 "close_price": close_price,
                 "volume": volume,
-                "raw_json": json.dumps({
-                    "ticker": ticker,
-                    "open": open_price,
-                    "high": high_price,
-                    "low": low_price,
-                    "close": close_price,
-                    "volume": volume
-                }, ensure_ascii=False),
+                "raw_json": json.dumps(raw_json, ensure_ascii=False, allow_nan=False),
                 "collected_at": now_ts,
                 "as_of_ts": now_ts,
                 "source": SOURCE_NAME,
@@ -172,7 +212,8 @@ def fetch_index_rows(index_name, ticker, start_date, end_date):
 
         return rows
 
-    except Exception:
+    except Exception as e:
+        print(f"[ERROR] fetch_index_rows failed: {index_name} {ticker} / {e}")
         return []
 
 
