@@ -1,3 +1,9 @@
+"""public schema 덤프와 샘플 데이터를 정리하는 로컬 점검 후보 스크립트다.
+
+pg_dump와 PostgreSQL 조회를 사용해 DDL/샘플을 파일로 정리하는 용도이며 운영 수집 소스는 아니다.
+AWS Migration 전 참고용 정리 후보로만 다루고, 실행 시 DB 읽기와 로컬 파일 생성 영향을 확인한다.
+"""
+
 import os
 import subprocess
 from pathlib import Path

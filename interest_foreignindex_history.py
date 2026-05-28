@@ -1,3 +1,9 @@
+"""yfinance 기반 해외지수 가격 데이터를 과거 기간 기준으로 backfill하는 스크립트다.
+
+정의된 해외지수 ticker의 장기 이력을 조회해 PostgreSQL에 일괄 저장한다.
+대량 외부 요청과 DB 쓰기가 발생할 수 있으므로 실행 전 대상 범위를 확인한다.
+"""
+
 import yfinance as yf
 import psycopg2
 from db_config import get_db_config

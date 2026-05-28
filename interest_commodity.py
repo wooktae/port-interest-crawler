@@ -1,3 +1,9 @@
+"""yfinance 기반 원자재 가격 데이터를 일일 증분 수집하는 스크립트다.
+
+원자재별 최신 적재일을 확인한 뒤 필요한 기간만 조회해 PostgreSQL에 저장한다.
+yfinance 외부 요청과 DB upsert가 포함되므로 문서화/분석 중에는 실행하지 않는다.
+"""
+
 import yfinance as yf
 import psycopg2
 from db_config import get_db_config

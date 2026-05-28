@@ -1,3 +1,9 @@
+"""DB에 적재된 가격 데이터를 기반으로 market breadth를 일일 계산하는 스크립트다.
+
+외부 API 대신 PostgreSQL 가격 테이블을 조회해 상승/하락/이동평균 통계를 산출한다.
+결과 저장을 포함하므로 실행 시 DB 읽기와 쓰기 영향이 있다.
+"""
+
 import psycopg2
 from db_config import get_db_config
 import psycopg2.extras

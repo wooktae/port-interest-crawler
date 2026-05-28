@@ -1,3 +1,9 @@
+"""Naver/yfinance 기반 관심종목 기본 정보를 수집하는 스크립트다.
+
+DB universe를 기준으로 Naver API성 데이터와 yfinance 정보를 조회해 기본 속성을 저장한다.
+외부 요청과 DB upsert가 포함되므로 운영 수집 단계에서만 실행한다.
+"""
+
 import requests
 import yfinance as yf
 import psycopg2

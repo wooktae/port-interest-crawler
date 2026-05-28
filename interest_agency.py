@@ -1,3 +1,9 @@
+"""Naver 증권 리서치/증권사 의견 데이터를 일일 증분 수집하는 스크립트다.
+
+Naver 웹 페이지를 요청해 리포트 상세 정보를 파싱하고 PostgreSQL에 upsert한다.
+외부 요청과 DB 쓰기가 포함되므로 운영 수집 단계에서만 실행한다.
+"""
+
 import requests
 from bs4 import BeautifulSoup
 import psycopg2

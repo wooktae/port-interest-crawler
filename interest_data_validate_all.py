@@ -1,3 +1,9 @@
+"""interest 데이터 전체 품질을 점검하는 validation 스크립트다.
+
+PostgreSQL 테이블의 최신일, NULL, 중복, domain 값, gap, row count 등을 읽기 중심으로 검사한다.
+일부 휴일 판단에 외부 API 요청이 포함될 수 있으므로 문서화 작업 중에는 실행하지 않는다.
+"""
+
 import requests
 import psycopg2
 from db_config import get_db_config
@@ -830,6 +836,7 @@ def print_summary():
 # MAIN
 # =========================================================
 def run():
+    """DB schema cache를 만든 뒤 전체 validation 항목을 순차 실행한다."""
     print("\n" + "=" * 100)
     print("INTEREST DATA VALIDATION")
     print("=" * 100)

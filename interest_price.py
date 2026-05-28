@@ -1,3 +1,9 @@
+"""yfinance 기반 국내 관심종목 가격 데이터를 일일 증분 수집하는 스크립트다.
+
+DB universe를 읽고 시장별 yfinance ticker로 변환한 뒤 최신 영업일 가격을 저장한다.
+yfinance 외부 요청과 DB upsert가 포함되므로 운영 수집 단계에서만 실행한다.
+"""
+
 import yfinance as yf
 import psycopg2
 from db_config import get_db_config

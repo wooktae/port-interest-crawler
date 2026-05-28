@@ -1,3 +1,9 @@
+"""Naver 금융 화면에서 관심종목 재무제표 데이터를 수집하는 Selenium 스크립트다.
+
+Chrome/ChromeDriver로 재무 페이지를 열고 BeautifulSoup으로 표 데이터를 파싱해 PostgreSQL에 저장한다.
+외부 웹 요청과 DB upsert가 포함되므로 운영 수집 단계에서만 실행한다.
+"""
+
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options

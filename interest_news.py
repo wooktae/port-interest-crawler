@@ -1,3 +1,9 @@
+"""Naver 뉴스 검색 결과를 일일 증분 수집하는 스크립트다.
+
+날짜별 뉴스 링크와 기사 본문을 요청/파싱하고 PostgreSQL에 저장한다.
+외부 웹 요청과 DB upsert가 포함되므로 운영 수집 단계에서만 실행한다.
+"""
+
 import requests
 from bs4 import BeautifulSoup
 import psycopg2

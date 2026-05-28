@@ -1,3 +1,9 @@
+"""Naver 증권 화면에서 시장별 stock universe 후보를 수집하는 Selenium 스크립트다.
+
+Chrome/ChromeDriver와 PostgreSQL 접속이 필요하며, 스크롤 기반 웹 수집 후 DB에 저장한다.
+실행 시 외부 웹 요청과 DB 쓰기가 발생하므로 운영 환경에서만 의도적으로 실행한다.
+"""
+
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options

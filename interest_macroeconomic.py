@@ -1,3 +1,9 @@
+"""yfinance 기반 매크로 지표 데이터를 일일 증분 수집하는 스크립트다.
+
+국가/지표별 최신 적재 기간 이후 데이터를 조회하고 PostgreSQL에 저장한다.
+yfinance 외부 요청과 DB upsert가 포함되므로 운영 수집 단계에서만 실행한다.
+"""
+
 import yfinance as yf
 import psycopg2
 from db_config import get_db_config

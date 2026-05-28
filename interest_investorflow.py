@@ -1,3 +1,9 @@
+"""Naver 금융의 종목별 투자자 수급 데이터를 일일 증분 수집하는 스크립트다.
+
+관심 universe를 DB에서 읽고, 최근 영업일 대상 수급 테이블을 웹 요청으로 파싱해 저장한다.
+외부 요청과 DB upsert가 포함되므로 운영 수집 단계에서만 실행한다.
+"""
+
 import requests
 from bs4 import BeautifulSoup
 import psycopg2

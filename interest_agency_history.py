@@ -1,3 +1,9 @@
+"""Naver 증권 리서치/증권사 의견 데이터를 과거 기간 기준으로 backfill하는 스크립트다.
+
+페이지 단위로 과거 리포트를 순회하고 상세 데이터를 파싱해 PostgreSQL에 저장한다.
+대량 외부 요청과 DB 쓰기가 발생할 수 있으므로 실행 전 기간과 중복 정책을 확인한다.
+"""
+
 import requests
 from bs4 import BeautifulSoup
 import psycopg2

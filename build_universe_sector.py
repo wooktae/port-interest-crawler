@@ -1,3 +1,9 @@
+"""stock universe의 sector/industry 정보를 yfinance 기준으로 보강하는 스크립트다.
+
+DB에서 universe와 매핑 정보를 읽고 yfinance 외부 요청으로 업종 정보를 조회한다.
+결과는 PostgreSQL reference/interest 계열 테이블에 갱신될 수 있으므로 실행 전 영향 범위를 확인한다.
+"""
+
 import time
 import psycopg2
 from db_config import get_db_config

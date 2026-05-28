@@ -1,3 +1,9 @@
+"""관심종목 가격 데이터의 누락 여부를 확인하는 check 스크립트다.
+
+DB universe와 price 테이블을 읽어 최근 영업일 기준 미수집 종목을 출력한다.
+휴일 판정과 DB 읽기가 포함되며, 저장 로직은 수행하지 않는 점검 용도다.
+"""
+
 import psycopg2
 from db_config import get_db_config
 from datetime import datetime, timedelta

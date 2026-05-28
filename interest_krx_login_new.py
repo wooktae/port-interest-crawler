@@ -1,3 +1,9 @@
+"""KRX 웹 수집 전 로그인 상태를 준비하는 Selenium 보조 스크립트다.
+
+디버그 Chrome에 attach하거나 새 세션을 시작해 로그인 화면, iframe, 중복 로그인 팝업을 처리한다.
+계정 정보와 브라우저 상태에 의존하므로 운영 환경에서만 의도적으로 실행한다.
+"""
+
 import os
 import subprocess
 import time

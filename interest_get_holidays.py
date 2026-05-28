@@ -1,3 +1,9 @@
+"""시장 휴일 여부를 조회하는 공통 보조 모듈이다.
+
+Nager.Date API를 호출해 국가별 공휴일을 가져오고, KRX/US 시장 휴일 판정에 사용된다.
+외부 API 요청이 포함되므로 호출하는 validation/수집 스크립트 실행 시 네트워크 영향이 있다.
+"""
+
 import requests
 from datetime import datetime, date
 

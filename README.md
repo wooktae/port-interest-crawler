@@ -56,6 +56,8 @@
 
 `test`, `debug`, HTML dump, 임시 파일처럼 보이는 로컬 산출물은 1차 정리에서 제거했다. 이후 새로 생성되는 임시 산출물은 운영 소스로 단정하지 않고 별도 후보로 취급한다.
 
+전체 파일별 역할, 주요 책임, 운영 주의사항은 `docs/source-file-catalog.md`에 정리한다. AWS Migration 전 초기 정리에서는 unused/legacy 의심 파일도 삭제하지 않고 “정리 후보”로만 표시한다.
+
 ## 주요 기능
 
 - Naver 금융/뉴스 기반 리서치, 뉴스, 투자자 수급, 티커 기초/가치/재무 데이터 수집
@@ -158,6 +160,13 @@ interest, reference, legacy, public
 - 주문 제출 또는 주문 실행 금지
 - 민감정보 값 출력 또는 문서 기록 금지
 - 민감정보가 필요하면 `[REDACTED]`로 마스킹
+
+## 문서화 기준
+
+- Python 파일에는 파일 상단 module docstring으로 역할, 진입점, DB/외부 API 의존성을 짧게 남긴다.
+- 의미가 불명확하거나 운영상 중요한 함수에만 짧은 function docstring을 추가한다.
+- HTML, CSS, SQL, YAML, properties 같은 설정/마크업 파일은 필요한 경우 상단 또는 큰 섹션 단위로만 주석을 남긴다.
+- 주석에는 실제 password, token, API key, 계좌번호, webhook URL 같은 민감정보 값을 기록하지 않는다.
 
 ## 검증
 

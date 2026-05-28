@@ -1,3 +1,9 @@
+"""KRX 수집용 Chrome 디버그 세션을 준비하는 Windows 보조 스크립트다.
+
+디버그 포트 확인, Chrome 프로세스 제어, 창 포커스 조정 등 로컬 GUI 작업을 수행한다.
+운영 PC 환경에 영향을 줄 수 있으므로 문서화/분석 중에는 실행하지 않는다.
+"""
+
 import os
 import subprocess
 import time

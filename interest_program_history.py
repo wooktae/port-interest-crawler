@@ -1,3 +1,9 @@
+"""KRX 웹에서 프로그램 매매 데이터를 과거 기간 기준으로 backfill하는 Selenium 스크립트다.
+
+기간별 CSV 다운로드와 파싱 후 PostgreSQL 저장을 수행한다.
+대량 다운로드와 DB 쓰기가 발생할 수 있으므로 실행 전 기간과 로컬 다운로드 경로를 확인한다.
+"""
+
 import os
 import glob
 import time

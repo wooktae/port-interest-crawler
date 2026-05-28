@@ -1,4 +1,10 @@
 # interest_log_format.py
+"""interest 수집 스크립트에서 사용하는 콘솔 로그 포맷 보조 모듈이다.
+
+단계별 성공/실패/수집일 요약과 일일 수집 summary 출력 형식을 통일한다.
+외부 요청이나 DB 접근은 없고, 다른 수집 모듈에서 출력 전용으로 호출한다.
+"""
+
 
 from typing import List, Dict, Optional
 

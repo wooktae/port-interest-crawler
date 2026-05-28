@@ -1,3 +1,9 @@
+"""Naver 뉴스 검색 결과를 과거 기간 기준으로 backfill하는 스크립트다.
+
+날짜별 링크 수집과 기사 파싱을 병렬 처리하고 PostgreSQL에 저장한다.
+대량 외부 요청과 DB 쓰기가 발생할 수 있으므로 실행 전 기간과 요청 제한을 확인한다.
+"""
+
 import requests
 from bs4 import BeautifulSoup
 import psycopg2

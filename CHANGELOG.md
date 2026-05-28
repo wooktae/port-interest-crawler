@@ -5,6 +5,8 @@
 ### Added
 
 - `docs/database.md`에 portfolio 단일 DB와 schema-per-domain 구조, interest 모듈 `search_path` 기준을 추가했다.
+- `docs/source-file-catalog.md`에 주요 소스/문서 파일별 역할, 책임, 운영 주의사항을 추가했다.
+- Python 스크립트 상단에 한글 module docstring을 추가해 파일별 실행 영향과 외부/DB 의존성을 설명했다.
 
 ### Changed
 
@@ -12,6 +14,12 @@
 - schema-per-domain 전환 후에도 기존 SQL이 `interest, reference, legacy, public` search_path 기반으로 동작한다는 설명을 추가했다.
 - AWS Migration 준비 관점에서 단일 DB `portfolio` 안의 domain schema 구조를 사용한다고 명시했다.
 - 민감정보는 환경변수 또는 로컬 설정으로 관리하고 실제 password/token/account/webhook 값은 문서에 기록하지 않는 기준을 보강했다.
+
+### Docs
+
+- README에 파일 카탈로그 위치와 주석 작성 기준을 추가했다.
+- `docs/worklog/2026-05-28.md`에 파일 카탈로그/주석 정리 작업 기록을 추가했다.
+- 기능 변경 없음.
 
 ## 2026-05-27
 

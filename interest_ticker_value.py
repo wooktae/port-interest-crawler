@@ -1,3 +1,9 @@
+"""Naver 기반 관심종목 valuation 데이터를 수집하는 스크립트다.
+
+종목별 valuation 원천 데이터를 요청하고 필요한 값을 파싱해 PostgreSQL에 저장한다.
+외부 웹 요청과 DB upsert가 포함되므로 운영 수집 단계에서만 실행한다.
+"""
+
 import requests
 import psycopg2
 from db_config import get_db_config

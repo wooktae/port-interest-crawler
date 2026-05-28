@@ -1,3 +1,9 @@
+"""Naver 금융의 종목별 투자자 수급 데이터를 과거 기간 기준으로 backfill하는 스크립트다.
+
+종목별 전체 페이지를 순회해 투자자 수급 이력을 파싱하고 PostgreSQL에 저장한다.
+대량 웹 요청과 DB 쓰기가 발생할 수 있으므로 실행 전 대상 universe와 제한을 확인한다.
+"""
+
 import requests
 from bs4 import BeautifulSoup
 import psycopg2
