@@ -1,7 +1,13 @@
-"""public schema 덤프와 샘플 데이터를 정리하는 로컬 점검 후보 스크립트다.
+"""schema-per-domain 구조의 DDL과 샘플 데이터를 정리하는 로컬 점검 스크립트다.
 
-pg_dump와 PostgreSQL 조회를 사용해 DDL/샘플을 파일로 정리하는 용도이며 운영 수집 소스는 아니다.
-AWS Migration 전 참고용 정리 후보로만 다루고, 실행 시 DB 읽기와 로컬 파일 생성 영향을 확인한다.
+pg_dump와 PostgreSQL 조회를 사용해 schema/table별 DDL, row count, sample data를
+하나의 텍스트 파일로 정리한다. 운영 수집 소스가 아니라 AWS Migration 전
+로컬 점검/문서화 후보 스크립트다.
+
+주의:
+- DB 읽기와 로컬 파일 생성만 수행한다.
+- 기본 대상은 portfolio DB의 schema-per-domain 전환 후 스키마다.
+- pg_dump 경로는 환경변수 PG_DUMP_PATH로 재정의할 수 있다.
 """
 
 import os
@@ -15,19 +21,45 @@ from psycopg2 import sql
 
 DB_CONFIG = get_db_config()
 
-SCHEMA = "public"
-LIMIT = 20
+# 2026-05 schema-per-domain 기준.
+# 필요하면 환경변수 DUMP_SCHEMAS="reference,interest,..." 로 실행 시 재정의 가능.
+DEFAULT_SCHEMAS = [
+    "reference",
+    "interest",
+    "preprocessor",
+    "research",
+    "decision",
+    "execution",
+    "connector",
+    "ops",
+    "legacy",
+]
 
-PG_DUMP = r"C:\Program Files\PostgreSQL\18\bin\pg_dump.exe"
+SCHEMAS = [
+    s.strip()
+    for s in os.getenv("DUMP_SCHEMAS", ",".join(DEFAULT_SCHEMAS)).split(",")
+    if s.strip()
+]
+
+LIMIT = int(os.getenv("DUMP_SAMPLE_LIMIT", "20"))
+
+PG_DUMP = os.getenv(
+    "PG_DUMP_PATH",
+    r"C:\Program Files\PostgreSQL\18\bin\pg_dump.exe",
+)
+
+OUTPUT_FILE = os.getenv("DUMP_OUTPUT_FILE", "ALL_SCHEMA_TABLE_DUMP.txt")
 
 ORDER_PRIORITY = [
     "created_at",
     "updated_at",
     "date",
+    "run_date",
+    "data_date",
     "published_at",
     "period",
     "as_of_date",
-    "id"
+    "id",
 ]
 
 
@@ -35,48 +67,96 @@ def get_conn():
     return psycopg2.connect(**DB_CONFIG)
 
 
-def get_tables(conn):
+def get_existing_schemas(conn):
+    """요청한 스키마 중 실제 DB에 존재하는 스키마만 반환한다."""
     with conn.cursor() as cur:
-        cur.execute("""
-            SELECT table_name
-            FROM information_schema.tables
-            WHERE table_schema = %s
-              AND table_type = 'BASE TABLE'
-            ORDER BY table_name
-        """, (SCHEMA,))
+        cur.execute(
+            """
+            SELECT schema_name
+            FROM information_schema.schemata
+            WHERE schema_name = ANY(%s)
+            ORDER BY array_position(%s, schema_name)
+            """,
+            (SCHEMAS, SCHEMAS),
+        )
         return [r[0] for r in cur.fetchall()]
 
 
-def get_columns(conn, table):
+def get_tables(conn, schemas):
+    """schema-per-domain 기준으로 schema/table 목록을 반환한다."""
     with conn.cursor() as cur:
-        cur.execute("""
+        cur.execute(
+            """
+            SELECT table_schema, table_name
+            FROM information_schema.tables
+            WHERE table_schema = ANY(%s)
+              AND table_type = 'BASE TABLE'
+            ORDER BY array_position(%s, table_schema), table_name
+            """,
+            (schemas, schemas),
+        )
+        return [(r[0], r[1]) for r in cur.fetchall()]
+
+
+def get_columns(conn, schema_name, table_name):
+    with conn.cursor() as cur:
+        cur.execute(
+            """
             SELECT column_name
             FROM information_schema.columns
             WHERE table_schema = %s
               AND table_name = %s
-        """, (SCHEMA, table))
+            ORDER BY ordinal_position
+            """,
+            (schema_name, table_name),
+        )
         return [r[0] for r in cur.fetchall()]
 
 
 def build_order_clause(cols):
     for c in ORDER_PRIORITY:
         if c in cols:
-            return f'ORDER BY "{c}" DESC'
-    return ""
+            return sql.SQL(" ORDER BY {} DESC").format(sql.Identifier(c))
+    return sql.SQL("")
 
 
-def get_row_count(conn, table):
+def get_row_count(conn, schema_name, table_name):
     with conn.cursor() as cur:
-        cur.execute(sql.SQL("SELECT COUNT(*) FROM {}.{}").format(
-            sql.Identifier(SCHEMA),
-            sql.Identifier(table)
-        ))
+        cur.execute(
+            sql.SQL("SELECT COUNT(*) FROM {}.{}").format(
+                sql.Identifier(schema_name),
+                sql.Identifier(table_name),
+            )
+        )
         return cur.fetchone()[0]
+
+
+def compact_text(text, max_blank_lines=1):
+    """
+    연속된 공백줄을 max_blank_lines 개수만 남기고 줄인다.
+    기본값 1이면 빈 줄은 최대 1줄만 허용한다.
+    """
+    lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+
+    compacted = []
+    blank_count = 0
+
+    for line in lines:
+        if line.strip() == "":
+            blank_count += 1
+            if blank_count <= max_blank_lines:
+                compacted.append("")
+        else:
+            blank_count = 0
+            compacted.append(line.rstrip())
+
+    return "\n".join(compacted).strip()
+
 
 def clean_pg_dump_ddl(text):
     """
     pg_dump schema-only 결과에서 반복 헤더/푸터와 SET 옵션을 제거하고,
-    실제 CREATE/ALTER/INDEX/TRIGGER 중심 DDL만 남김.
+    실제 CREATE/ALTER/INDEX/TRIGGER 중심 DDL만 남긴다.
     """
     text = text.replace("\r\n", "\n").replace("\r", "\n")
 
@@ -100,30 +180,38 @@ def clean_pg_dump_ddl(text):
 
         if stripped.startswith(remove_prefixes):
             continue
-        
+
         if stripped.startswith("--"):
             continue
-        
+
         kept.append(line.rstrip())
 
     return "\n".join(kept).strip()
 
-def get_ddl(table):
+
+def get_ddl(schema_name, table_name):
     cmd = [
         PG_DUMP,
-        "-h", DB_CONFIG["host"],
-        "-p", str(DB_CONFIG["port"]),
-        "-U", DB_CONFIG["user"],
-        "-d", DB_CONFIG["dbname"],
-        "-t", f"{SCHEMA}.{table}",
+        "-h",
+        DB_CONFIG["host"],
+        "-p",
+        str(DB_CONFIG["port"]),
+        "-U",
+        DB_CONFIG["user"],
+        "-d",
+        DB_CONFIG["dbname"],
+        "-t",
+        f'{schema_name}.{table_name}',
         "--schema-only",
         "--no-owner",
         "--no-privileges",
-        "--encoding=UTF8"
+        "--encoding=UTF8",
     ]
 
     env = os.environ.copy()
-    env["PGPASSWORD"] = DB_CONFIG["password"]
+    password = DB_CONFIG.get("password")
+    if password:
+        env["PGPASSWORD"] = password
 
     result = subprocess.run(cmd, capture_output=True, env=env)
 
@@ -136,101 +224,108 @@ def get_ddl(table):
     return clean_pg_dump_ddl(stdout)
 
 
-def get_sample(conn, table, order_clause):
+def get_sample(conn, schema_name, table_name, order_clause):
     with conn.cursor() as cur:
-        query = f'SELECT * FROM "{SCHEMA}"."{table}" {order_clause} LIMIT {LIMIT}'
-        cur.execute(query)
+        query = sql.SQL("SELECT * FROM {}.{}{}").format(
+            sql.Identifier(schema_name),
+            sql.Identifier(table_name),
+            order_clause,
+        ) + sql.SQL(" LIMIT %s")
+        cur.execute(query, (LIMIT,))
         rows = cur.fetchall()
         cols = [d[0] for d in cur.description]
     return cols, rows
 
 
+def format_value(value):
+    if value is None:
+        return "NULL"
+
+    text = str(value)
+    if len(text) > 200:
+        return text[:200] + "..."
+    return text
+
+
 def format_row(row):
-    out = []
-    for v in row:
-        if isinstance(v, str) and len(v) > 200:
-            v = v[:200] + "..."
-        out.append(str(v))
-    return " | ".join(out)
+    return " | ".join(format_value(v) for v in row)
 
-def compact_text(text, max_blank_lines=1):
-    """
-    연속된 공백줄을 max_blank_lines 개수만 남기고 줄임.
-    기본값 1이면 빈 줄은 최대 1줄만 허용.
-    """
-    lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
 
-    compacted = []
-    blank_count = 0
+def write_header(f, existing_schemas, tables):
+    f.write("=" * 100 + "\n")
+    f.write("SCHEMA-PER-DOMAIN TABLE DUMP\n")
+    f.write("=" * 100 + "\n")
+    f.write(f"DATABASE: {DB_CONFIG.get('dbname')}\n")
+    f.write(f"SCHEMAS: {', '.join(existing_schemas)}\n")
+    f.write(f"TOTAL TABLES: {len(tables)}\n")
+    f.write(f"SAMPLE LIMIT: {LIMIT}\n")
+    f.write("\n")
 
-    for line in lines:
-        if line.strip() == "":
-            blank_count += 1
-            if blank_count <= max_blank_lines:
-                compacted.append("")
-        else:
-            blank_count = 0
-            compacted.append(line.rstrip())
-
-    return "\n".join(compacted).strip()
 
 def main():
-
-    output_file = Path.cwd() / "ALL_TABLE_DUMP.txt"
+    output_file = Path.cwd() / OUTPUT_FILE
 
     conn = get_conn()
-    tables = get_tables(conn)
+    try:
+        existing_schemas = get_existing_schemas(conn)
+        missing_schemas = [s for s in SCHEMAS if s not in existing_schemas]
+        tables = get_tables(conn, existing_schemas)
 
-    print("TOTAL TABLES:", len(tables))
+        print("SCHEMAS:", ", ".join(existing_schemas))
+        if missing_schemas:
+            print("MISSING SCHEMAS:", ", ".join(missing_schemas))
+        print("TOTAL TABLES:", len(tables))
 
-    with open(output_file, "w", encoding="utf-8", errors="replace") as f:
+        with open(output_file, "w", encoding="utf-8", errors="replace") as f:
+            write_header(f, existing_schemas, tables)
 
-        for idx, table in enumerate(tables, 1):
+            for idx, (schema_name, table_name) in enumerate(tables, 1):
+                full_name = f"{schema_name}.{table_name}"
+                print(f"[{idx}/{len(tables)}] {full_name}")
 
-            print(f"[{idx}/{len(tables)}] {table}")
+                cols = get_columns(conn, schema_name, table_name)
+                order_clause = build_order_clause(cols)
+                row_count = get_row_count(conn, schema_name, table_name)
+                ddl = get_ddl(schema_name, table_name)
 
-            cols = get_columns(conn, table)
-            order_clause = build_order_clause(cols)
+                try:
+                    sample_cols, sample_rows = get_sample(
+                        conn,
+                        schema_name,
+                        table_name,
+                        order_clause,
+                    )
+                    sample_error = None
+                except Exception as e:
+                    conn.rollback()
+                    sample_cols = []
+                    sample_rows = []
+                    sample_error = str(e)
 
-            row_count = get_row_count(conn, table)
+                f.write("=" * 100 + "\n")
+                f.write(f"{idx}. TABLE: {full_name}\n")
+                f.write("=" * 100 + "\n")
 
-            ddl = get_ddl(table)
+                f.write("[DDL]\n")
+                f.write(ddl.strip() + "\n")
 
-            try:
-                sample_cols, sample_rows = get_sample(conn, table, order_clause)
-            except Exception as e:
-                sample_cols = []
-                sample_rows = []
-                sample_error = str(e)
+                f.write("[ROW COUNT]\n")
+                f.write(str(row_count) + "\n")
 
-            # ==========================
-            # WRITE
-            # ==========================
-            f.write("=" * 100 + "\n")
-            f.write(f"{idx}. TABLE: {table}\n")
-            f.write("=" * 100 + "\n")
+                f.write(f"[SAMPLE DATA - {LIMIT} ROWS]\n")
+                if sample_rows:
+                    f.write(" | ".join(sample_cols) + "\n")
+                    f.write("-" * 80 + "\n")
+                    for row in sample_rows:
+                        f.write(format_row(row) + "\n")
+                elif sample_error:
+                    f.write(f"(ERROR: {sample_error})\n")
+                else:
+                    f.write("(NO DATA)\n")
 
-            # DDL
-            f.write("[DDL]\n")
-            f.write(ddl.strip() + "\n")
-
-            # ROW COUNT
-            f.write("[ROW COUNT]\n")
-            f.write(str(row_count) + "\n")
-
-            # SAMPLE
-            f.write("[SAMPLE DATA - 20 ROWS]\n")
-
-            if sample_rows:
-                f.write(" | ".join(sample_cols) + "\n")
-                f.write("-" * 80 + "\n")
-                for r in sample_rows:
-                    f.write(format_row(r) + "\n")
-            else:
-                f.write("(NO DATA OR ERROR)\n")
-
-            f.write("\n")
-    conn.close()
+                f.write("\n")
+    finally:
+        conn.close()
 
     print("\nDONE")
     print("OUTPUT FILE:", output_file)

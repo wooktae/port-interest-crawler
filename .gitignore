@@ -11,7 +11,7 @@ venv/
 .vscode/
 
 *.html
-ALL_TABLE_DUMP.txt
+ALL_SCHEMA_TABLE_DUMP.txt
 *.dump
 *.tmp
 
