@@ -19,6 +19,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libasound2 \
     && rm -rf /var/lib/apt/lists/*
 
+RUN chromium --version && chromedriver --version
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
