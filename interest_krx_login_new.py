@@ -2,11 +2,18 @@
 
 디버그 Chrome에 attach하거나 새 세션을 시작해 로그인 화면, iframe, 중복 로그인 팝업을 처리한다.
 계정 정보와 브라우저 상태에 의존하므로 운영 환경에서만 의도적으로 실행한다.
+
+운영 안전 기준:
+- 최종 로그인 상태가 확인된 경우에만 exit 0
+- 로그인 화면 / 점검 화면 / 업그레이드 화면 / Selenium 실패 / timeout은 exit non-zero
+- 콘솔 로그는 interest_log_format.print_step_log() 공통 포맷을 사용한다.
 """
 
 import os
+import sys
 import subprocess
 import time
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from datetime import datetime
 
 from selenium import webdriver
@@ -15,6 +22,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
+from interest_log_format import print_step_log
+
 
 DEBUG_PORT = "9222"
 KRX_MAIN_URL = "https://data.krx.co.kr/contents/MDC/MAIN/main/index.cmd"
@@ -22,38 +31,36 @@ KRX_MAIN_URL = "https://data.krx.co.kr/contents/MDC/MAIN/main/index.cmd"
 KRX_USER_ID = os.getenv("KRX_USER_ID", "yukiever")
 KRX_USER_PASSWORD = os.getenv("KRX_USER_PASSWORD")
 
-LINE = "=" * 100
+LOGIN_HARD_TIMEOUT_SECONDS = int(os.getenv("KRX_LOGIN_TIMEOUT_SECONDS", "180"))
+
 DEBUG_LOG = False
-
-
-def print_header(step_name: str):
-    print(LINE)
-    print(f"START :: {step_name}")
-    print(LINE)
-    print("Starting....\n")
-
-
-def print_success(lines=None):
-    print("[Success]")
-    if lines:
-        for line in lines:
-            print(line)
-
-
-def print_failed(lines=None):
-    print("[Failed]")
-    if lines:
-        for line in lines:
-            print(line)
 
 
 def debug(message: str):
     if DEBUG_LOG:
-        print(f"[DEBUG] {message}")
+        print(f"[DEBUG] {message}", flush=True)
 
 
 def pause(seconds):
     time.sleep(seconds)
+
+
+# ---------------------------
+# result 생성 / 출력
+# ---------------------------
+def build_result(status, success_lines=None, error_lines=None, failed_lines=None):
+    return {
+        "status": status,
+        "collected_dates": [],
+        "success_lines": success_lines or [],
+        "error_lines": error_lines or [],
+        "failed_lines": failed_lines or [],
+        "error_count": 0 if status == "SUCCESS" else 1,
+    }
+
+
+def print_result(result):
+    print_step_log("interest_krx_login", result)
 
 
 # ---------------------------
@@ -75,7 +82,7 @@ def start_debug_chrome():
         ["python", "interest_krx_chrome.py"],
         shell=True,
         stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL
+        stderr=subprocess.DEVNULL,
     )
 
     time.sleep(6)
@@ -121,6 +128,72 @@ def activate_browser_window(driver):
         debug(f"window.focus failed: {e}")
 
     pause(1)
+
+
+# ---------------------------
+# KRX 점검 / 업그레이드 화면 감지
+# ---------------------------
+def read_page_text(driver, max_length=4000):
+    try:
+        driver.switch_to.default_content()
+    except Exception:
+        pass
+
+    try:
+        text = driver.execute_script(
+            """
+            const title = document.title || '';
+            const body = document.body ? document.body.innerText : '';
+            return title + '\\n' + body;
+            """
+        )
+    except Exception:
+        try:
+            text = driver.page_source
+        except Exception:
+            return ""
+
+    if text is None:
+        return ""
+
+    return str(text)[:max_length]
+
+
+def is_maintenance_page(driver):
+    text = read_page_text(driver)
+
+    if not text:
+        return False
+
+    maintenance_keywords = [
+        "점검",
+        "시스템 점검",
+        "서비스 점검",
+        "서비스 일시 중단",
+        "홈페이지 업그레이드",
+        "업그레이드",
+        "서비스 이용에 불편",
+        "maintenance",
+        "temporarily unavailable",
+        "service unavailable",
+    ]
+
+    lower_text = text.lower()
+
+    for keyword in maintenance_keywords:
+        if keyword.lower() in lower_text:
+            return True
+
+    return False
+
+
+def assert_not_maintenance_page(driver, phase):
+    if is_maintenance_page(driver):
+        text = read_page_text(driver, max_length=800)
+        raise Exception(
+            f"KRX maintenance/upgrade page detected during {phase}. "
+            f"page_text={text!r}"
+        )
 
 
 # ---------------------------
@@ -248,7 +321,7 @@ def close_alert_if_exists(driver):
             By.XPATH,
             "//button[contains(normalize-space(), '확인')]"
             " | //a[contains(normalize-space(), '확인')]"
-            " | //span[contains(normalize-space(), '확인')]/ancestor::*[self::button or self::a][1]"
+            " | //span[contains(normalize-space(), '확인')]/ancestor::*[self::button or self::a][1]",
         )
 
         for btn in buttons:
@@ -290,7 +363,7 @@ def handle_duplicate_login_confirm_in_current_context(driver):
     try:
         texts = driver.find_elements(
             By.XPATH,
-            "//*[contains(normalize-space(), '이미 로그인된 계정입니다')]"
+            "//*[contains(normalize-space(), '이미 로그인된 계정입니다')]",
         )
 
         visible_text_found = False
@@ -310,8 +383,14 @@ def handle_duplicate_login_confirm_in_current_context(driver):
             (By.XPATH, "//button[contains(normalize-space(), '확인')]"),
             (By.XPATH, "//a[contains(normalize-space(), '확인')]"),
             (By.XPATH, "//*[contains(@class, 'btn-confirm')]"),
-            (By.XPATH, "//*[contains(@class, 'ui-button') and contains(normalize-space(), '확인')]"),
-            (By.XPATH, "//span[contains(normalize-space(), '확인')]/ancestor::button[1]"),
+            (
+                By.XPATH,
+                "//*[contains(@class, 'ui-button') and contains(normalize-space(), '확인')]",
+            ),
+            (
+                By.XPATH,
+                "//span[contains(normalize-space(), '확인')]/ancestor::button[1]",
+            ),
         ]
 
         for by, selector in confirm_button_candidates:
@@ -404,7 +483,7 @@ def set_input_value_with_events(driver, selector, value):
         return true;
         """,
         selector,
-        value
+        value,
     )
 
 
@@ -413,6 +492,7 @@ def set_input_value_with_events(driver, selector, value):
 # ---------------------------
 def do_krx_login(driver):
     activate_browser_window(driver)
+    assert_not_maintenance_page(driver, phase="before login")
 
     if not KRX_USER_PASSWORD:
         raise Exception(
@@ -430,11 +510,15 @@ def do_krx_login(driver):
         )
     )
 
-    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", login_btn)
+    driver.execute_script(
+        "arguments[0].scrollIntoView({block: 'center'});",
+        login_btn,
+    )
     pause(0.3)
     driver.execute_script("arguments[0].click();", login_btn)
 
     pause(2)
+    assert_not_maintenance_page(driver, phase="after login button click")
 
     # 2) 로그인 iframe 진입
     switch_to_login_iframe(driver, timeout=20)
@@ -448,7 +532,10 @@ def do_krx_login(driver):
         )
     )
 
-    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", id_input)
+    driver.execute_script(
+        "arguments[0].scrollIntoView({block: 'center'});",
+        id_input,
+    )
     pause(0.3)
 
     id_input.click()
@@ -471,7 +558,10 @@ def do_krx_login(driver):
         )
     )
 
-    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", pw_input)
+    driver.execute_script(
+        "arguments[0].scrollIntoView({block: 'center'});",
+        pw_input,
+    )
     pause(0.3)
 
     pw_input.click()
@@ -532,7 +622,10 @@ def do_krx_login(driver):
         )
     )
 
-    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", submit_btn)
+    driver.execute_script(
+        "arguments[0].scrollIntoView({block: 'center'});",
+        submit_btn,
+    )
     pause(0.3)
     driver.execute_script("arguments[0].click();", submit_btn)
 
@@ -542,21 +635,9 @@ def do_krx_login(driver):
     # 7) 기본 페이지 복귀 후 최종 확인
     driver.switch_to.default_content()
 
+    assert_not_maintenance_page(driver, phase="after login submit")
+
     return is_logged_in(driver)
-
-
-# ---------------------------
-# result 생성
-# ---------------------------
-def build_result(status, success_lines=None, error_lines=None, failed_lines=None):
-    return {
-        "status": status,
-        "collected_dates": [datetime.now().strftime("%Y-%m-%d")],
-        "success_lines": success_lines or [],
-        "error_lines": error_lines or [],
-        "failed_lines": failed_lines or [],
-        "error_count": 0 if status == "SUCCESS" else 1
-    }
 
 
 # ---------------------------
@@ -564,8 +645,7 @@ def build_result(status, success_lines=None, error_lines=None, failed_lines=None
 # ---------------------------
 def run():
     start = datetime.now()
-
-    print_header("krx_login")
+    driver = None
 
     try:
         driver = get_driver()
@@ -577,23 +657,24 @@ def run():
 
         activate_browser_window(driver)
 
+        assert_not_maintenance_page(driver, phase="main page load")
+
         pause(2)
 
         # 분기 1: 이미 로그인된 상태
         if is_logged_in(driver):
             elapsed = (datetime.now() - start).total_seconds()
 
-            success_lines = [
-                "KRX already logged in",
-                f"KRX Login Ready / elapsed={elapsed:.2f}s"
-            ]
-
-            print_success(success_lines)
-
-            return build_result(
+            result = build_result(
                 status="SUCCESS",
-                success_lines=success_lines
+                success_lines=[
+                    "KRX already logged in",
+                    f"KRX Login Ready / elapsed={elapsed:.2f}s",
+                ],
             )
+
+            print_result(result)
+            return result
 
         # 분기 2: 로그인 안 된 상태
         login_confirmed = do_krx_login(driver)
@@ -603,28 +684,28 @@ def run():
         if not login_confirmed:
             failed_lines = [
                 "KRX login submitted but login marker was not confirmed",
-                f"elapsed={elapsed:.2f}s"
+                f"elapsed={elapsed:.2f}s",
             ]
 
-            print_failed(failed_lines)
-
-            return build_result(
+            result = build_result(
                 status="FAILED",
+                error_lines=failed_lines,
                 failed_lines=failed_lines,
-                error_lines=failed_lines
             )
 
-        success_lines = [
-            "KRX ID/PW Login Success",
-            f"KRX Login Ready / elapsed={elapsed:.2f}s"
-        ]
+            print_result(result)
+            return result
 
-        print_success(success_lines)
-
-        return build_result(
+        result = build_result(
             status="SUCCESS",
-            success_lines=success_lines
+            success_lines=[
+                "KRX ID/PW Login Success",
+                f"KRX Login Ready / elapsed={elapsed:.2f}s",
+            ],
         )
+
+        print_result(result)
+        return result
 
     except Exception as e:
         elapsed = (datetime.now() - start).total_seconds()
@@ -632,17 +713,62 @@ def run():
 
         failed_lines = [
             message,
-            f"elapsed={elapsed:.2f}s"
+            f"elapsed={elapsed:.2f}s",
         ]
 
-        print_failed(failed_lines)
-
-        return build_result(
+        result = build_result(
             status="FAILED",
+            error_lines=[message],
             failed_lines=failed_lines,
-            error_lines=[message]
         )
+
+        print_result(result)
+        return result
+
+
+def exit_code_from_result(result):
+    if not isinstance(result, dict):
+        return 1
+
+    status = str(result.get("status") or "").upper()
+    error_count = int(result.get("error_count") or 0)
+
+    if status == "SUCCESS" and error_count == 0:
+        return 0
+
+    return 1
+
+
+def run_with_hard_timeout(timeout_seconds=LOGIN_HARD_TIMEOUT_SECONDS):
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(run)
+
+        try:
+            return future.result(timeout=timeout_seconds)
+
+        except TimeoutError:
+            result = build_result(
+                status="FAILED",
+                error_lines=[
+                    f"KRX login timed out after {timeout_seconds}s",
+                ],
+                failed_lines=[
+                    f"KRX login timed out after {timeout_seconds}s",
+                    "KRX login process will exit with non-zero code",
+                ],
+            )
+
+            print_result(result)
+
+            try:
+                sys.stdout.flush()
+                sys.stderr.flush()
+            except Exception:
+                pass
+
+            os._exit(2)
 
 
 if __name__ == "__main__":
-    run()
+    result = run_with_hard_timeout()
+    sys.exit(exit_code_from_result(result))
