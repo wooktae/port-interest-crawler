@@ -10,6 +10,7 @@
 
 - 운영/일일 수집 후보
   - `interest_crawler_daily.py`
+  - `interest_crawler_daily_nongui.py`
   - `interest_crawler_main.py`
   - `interest_price.py`
   - `interest_marketbreadth.py`
@@ -39,6 +40,7 @@
   - `interest_data_validate_daily.py`
   - `interest_data_validate_all.py`
   - `interest_price_check.py`
+  - `interest_krx_raw_validate_daily.py`
 - KRX/Selenium/Chrome 관련 후보
   - `interest_krx_chrome.py`
   - `interest_krx_login_new.py`
@@ -53,6 +55,7 @@
 - legacy 또는 로컬 실험 후보
   - `dump_public_schema_final.py`
   - `block_watch_backtest_run.py`
+  - `patch_research_decision_dependency.py`
 
 `test`, `debug`, HTML dump, 임시 파일처럼 보이는 로컬 산출물은 1차 정리에서 제거했다. 이후 새로 생성되는 임시 산출물은 운영 소스로 단정하지 않고 별도 후보로 취급한다.
 
@@ -64,6 +67,8 @@
 - yfinance 기반 국내외 가격, 해외지수, 매크로, 원자재 데이터 수집
 - KRX 웹/Selenium 기반 공매도, 프로그램 매매 데이터 수집
 - PostgreSQL raw/history 계열 테이블 적재
+- non-GUI daily crawler와 Windows GUI KRX worker로 분리된 hybrid 실행 흐름 제공
+- KRX raw 적재 완료 여부를 확인하는 KRX raw validation 스크립트 제공
 - 일일 수집 orchestration 후보와 history/backfill 스크립트 분리
 - 데이터 품질 검증 및 gap/check 스크립트 제공
 - stock universe와 sector mapping 구성 후보 제공
@@ -81,6 +86,33 @@ python interest_crawler_daily.py
 history/backfill 스크립트는 장기간 데이터를 요청하고 DB에 대량 적재할 수 있다. 실행 전 대상 기간, DB 연결, unique key/upsert 정책, 외부 원천 제한을 확인해야 한다.
 
 validation/check 스크립트도 DB 연결 또는 외부 요청이 포함될 수 있으므로 문서화/분석 작업 중에는 실행하지 않는다.
+
+## AWS 운영 구조
+
+이 모듈은 portfolio system의 `aws-paper` 운영에서 데이터 수집 실행 단위로 사용된다. Daily 배치 오케스트레이션(Scheduler와 Step Functions 계열)이 데이터 수집 단계에 진입할 때 이 모듈이 호출 표면(invocation surface)이 된다. 오케스트레이션의 세부 상태머신, Scheduler 라인업, Lambda 내부 구현은 인접 시스템 소유이므로 이 저장소 문서에서는 다루지 않는다.
+
+Crawler는 KRX GUI 의존 여부에 따라 두 개의 실행 표면(hybrid execution model)으로 분리된다.
+
+- non-GUI daily crawler는 컨테이너/ECS Fargate RunTask 후보 실행 단위다. 진입점은 `interest_crawler_daily_nongui.py`이며 KRX GUI 의존 단계(`interest_krx_login_new`, `interest_program`, `interest_shortsell`)를 import하지 않는다. 실행 시 Naver, yfinance, 그리고 외부 휴일 API에 대한 outbound 요청과 PostgreSQL upsert가 발생한다.
+- GUI KRX worker는 Selenium/Chrome/GUI 의존 흐름이다. Windows Scheduled Task 후보 실행 단위로 분리되어 있으며 KRX program과 KRX shortsell 수집을 담당한다. 실행 시 KRX data portal로 outbound 요청이 발생하고, CSV 다운로드와 파싱을 거쳐 PostgreSQL upsert로 이어진다.
+- KRX worker 수집이 끝나면 `interest_krx_raw_validate_daily.py`가 `interest_program_raw`, `interest_shortsell_raw`의 최신 `trade_date`와 row_count를 확인해 raw 적재 여부를 판단한다. 실패 시 non-zero exit code로 종료해 후속 단계가 부적재 상태에서 이어지지 않도록 한다.
+
+실제 AWS 클러스터/서비스 이름, task definition ARN, Windows instance id, 사설 IP, 로컬 절대 경로, SSM command id는 이 문서에 원문으로 기록하지 않는다. 필요한 경우 `<CRAWLER_ECS_TASK>`, `<WINDOWS_KRX_WORKER>`, `<SCHEDULED_TASK_NAME>`, `<DB_HOST>`, `<CHROME_DRIVER_PATH>`, `<COMMAND_ID>` 같은 구조적 플레이스홀더만 사용한다.
+
+실행 책임 경계는 다음과 같다.
+
+- Crawler는 데이터 수집 스크립트 실행과 raw/history 적재만 책임진다.
+- 배치 오케스트레이션(Scheduler, Step Functions 계열)은 인접 시스템 책임이다.
+- View 계열은 실행 상태 조회 또는 trigger UI 용도로만 이 모듈을 참조한다.
+- Preprocessor MS는 이 모듈이 적재한 raw를 소비해 feature로 변환하는 후속 단계다.
+
+### KRX 점검/리다이렉트 감지 운영 주의사항
+
+KRX data portal은 점검 시간대, 리다이렉트, timeout이 발생할 수 있다. Selenium 기반 KRX 수집은 점검 페이지나 로그인 리다이렉트를 정상 응답으로 오해할 수 있으므로 다음 원칙을 따른다.
+
+- KRX 점검/리다이렉트/timeout이 감지되면 strict-exit 또는 fail-fast로 종료해 부적재 raw가 downstream으로 이어지지 않게 한다.
+- KRX worker 수집 완료 후 `interest_krx_raw_validate_daily.py`로 raw 최신 상태를 검증한다. row_count 0 또는 `max(trade_date)` 미달이면 실패로 처리한다.
+- 특정 일자의 장애 로그, 실행 시간, 일회성 command id는 이 문서에 남기지 않는다.
 
 ## 설정 방법
 

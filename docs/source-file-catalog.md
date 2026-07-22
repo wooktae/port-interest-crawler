@@ -7,6 +7,7 @@
 | 파일 경로 | 한글 제목 | 파일 내용 | 주요 역할 | 수정/운영 시 주의사항 |
 | --- | --- | --- | --- | --- |
 | `interest_crawler_daily.py` | 일일 수집 오케스트레이션 | KRX 로그인 이후 뉴스, 리서치, 가격, 수급, 프로그램 매매, 공매도, market breadth를 순서대로 호출한다. | 운영 일일 수집 단계를 묶는 최상위 실행 후보 | 실행 시 외부 요청, Selenium/Chrome, DB 쓰기가 연쇄 발생한다. 단계 순서를 임의 변경하지 않는다. |
+| `interest_crawler_daily_nongui.py` | non-GUI 일일 수집 오케스트레이션 | KRX GUI 의존 단계를 제외하고 뉴스, 리서치, 해외지수, 원자재, 매크로, 가격, 투자자 수급, market breadth를 순차 호출한다. | 컨테이너/ECS Fargate RunTask 후보로 사용될 수 있는 진입점 | 실행 시 Naver, yfinance, 휴일 API 호출과 DB upsert가 발생한다. KRX GUI 흐름은 별도 Windows worker로 분리된 상태로 유지한다. |
 | `interest_crawler_main.py` | 주요 수집 수동 실행기 | ticker, 뉴스, 리서치, 해외지수, 원자재, 매크로, market breadth 수집을 순차 호출한다. | 수동 또는 초기 수집용 오케스트레이션 후보 | 각 하위 모듈의 외부 연동과 DB upsert가 실행된다. |
 | `interest_price.py` | 국내 종목 가격 증분 수집 | DB universe를 읽고 yfinance ticker로 변환해 최근 가격을 저장한다. | 관심종목 일일 가격 raw/history 적재 | yfinance 요청, 휴일 판단, DB upsert가 포함된다. |
 | `interest_marketbreadth.py` | 시장 폭 지표 증분 계산 | DB 가격 데이터를 기반으로 상승/하락, 이동평균 관련 breadth 지표를 계산한다. | 가격 테이블 기반 파생 지표 산출 | 외부 API보다는 DB 읽기/쓰기가 핵심이다. 가격 테이블 전제와 계산 의미를 유지한다. |
@@ -44,6 +45,7 @@
 | `interest_data_validate_daily.py` | 일일 데이터 검증 | 최신일, NULL, row count, 이상치, 중복을 빠르게 확인한다. | 일일 수집 후 품질 점검 | DB 읽기와 휴일 API 요청 가능성이 있다. |
 | `interest_data_validate_all.py` | 전체 데이터 검증 | 테이블별 최신일, NULL, 중복, domain, gap, profile 등을 종합 점검한다. | AWS Migration 전 품질 확인 후보 | 읽기 중심이나 DB와 외부 휴일 API 의존성이 있다. |
 | `interest_price_check.py` | 가격 누락 점검 | 최근 영업일 기준 가격 미수집 종목을 계산해 출력한다. | price 적재 누락 확인 | DB 읽기와 휴일 판정에 의존하며 저장 로직은 없다. |
+| `interest_krx_raw_validate_daily.py` | KRX raw 적재 검증 | `interest_program_raw`와 `interest_shortsell_raw`의 최신 `trade_date`와 row_count를 확인해 KRX worker 수집 결과를 검증한다. | KRX GUI worker 수집 후 raw 적재 여부 판단 | 검증 실패 시 exit code 30으로 종료해 후속 단계가 부적재 상태에서 이어지지 않게 한다. DB 읽기 전용이며 외부 요청은 없다. |
 
 ## KRX/Selenium/Chrome 보조 후보
 
@@ -87,3 +89,4 @@
 | --- | --- | --- | --- | --- |
 | `block_watch_backtest_run.py` | 로컬 백테스트 실행 후보 | 블록 감시 백테스트 실행용으로 보이는 로컬 실험 파일이다. | 운영 수집과 직접 연결 여부 확인 대상 | 삭제하지 않고 정리 후보로만 표시한다. |
 | `dump_public_schema_final.py` | public schema 덤프 후보 | pg_dump와 DB 조회로 public schema DDL/샘플을 정리한다. | Migration 참고용 로컬 점검 후보 | 실행 시 DB 읽기와 로컬 파일 생성이 발생할 수 있다. |
+| `patch_research_decision_dependency.py` | research/decision 의존성 패치 후보 | Crawler 소유가 아닌 인접 도메인 의존성을 다루는 것으로 보이는 일회성 스크립트 후보다. | 운영 수집과 직접 연결 여부 확인 대상 | Crawler 책임 범위 밖으로 보이므로 삭제하지 않고 정리 후보로만 표시한다. 실행 여부는 별도 확인이 필요하다. |

@@ -5,6 +5,7 @@
 """
 
 import os
+import sys
 import glob
 import time
 import subprocess
@@ -518,5 +519,28 @@ def run():
         return result
 
 
+def exit_code_from_result(result):
+    if not isinstance(result, dict):
+        return 1
+
+    status = str(result.get("status") or "").upper()
+    error_count = int(result.get("error_count") or 0)
+
+    if status in {"SUCCESS", "NO_CHANGE"} and error_count == 0:
+        return 0
+
+    return 1
+
+
 if __name__ == "__main__":
-    run()
+    result = run()
+    exit_code = exit_code_from_result(result)
+
+    print(
+        "PROCESS_EXIT_DECISION "
+        f"status={str(result.get('status') or '').upper()} "
+        f"error_count={int(result.get('error_count') or 0)} "
+        f"exit_code={exit_code}"
+    )
+
+    sys.exit(exit_code)

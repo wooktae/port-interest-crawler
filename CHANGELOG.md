@@ -21,6 +21,28 @@
 - `docs/worklog/2026-05-28.md`에 파일 카탈로그/주석 정리 작업 기록을 추가했다.
 - 기능 변경 없음.
 
+## 2026-07-01
+
+### Added
+
+- README에 AWS 운영 구조 섹션을 추가해 Crawler가 AWS Paper 데이터 수집 실행 단위임을 명시했다.
+- README에 non-GUI daily crawler(`interest_crawler_daily_nongui.py`)와 Windows GUI KRX worker로 분리되는 hybrid 실행 흐름을 문서화했다.
+- README에 KRX 점검/리다이렉트/timeout 감지에 대한 strict-exit 운영 주의사항 섹션을 추가했다.
+- README 파일 구조 목록에 `interest_crawler_daily_nongui.py`(운영/일일 수집)와 `interest_krx_raw_validate_daily.py`(validation/check) 참조를 추가했다.
+- README legacy/로컬 실험 후보 목록에 `patch_research_decision_dependency.py`를 추가했다.
+- `docs/source-file-catalog.md`에 `interest_crawler_daily_nongui.py`, `interest_krx_raw_validate_daily.py`, `patch_research_decision_dependency.py` 항목을 추가했다.
+- `docs/worklog/2026-07-01.md`에 문서 최신화 작업 계획과 완료 기록을 추가했다.
+
+### Changed
+
+- README 주요 기능 목록에 hybrid 실행 흐름과 KRX raw validation 항목을 반영했다.
+
+### Notes
+
+- 이 변경은 문서 전용 업데이트다. 실제 크롤링, 외부 API 호출, Selenium/Chrome 실행, DB DDL/DML, AWS API 호출, Slack 호출, 주문 실행은 수행하지 않았다.
+- AWS 실행 대상은 호출 표면 관점(ECS RunTask 후보, Windows Scheduled Task 후보)에서만 서술했다. 실제 cluster/task definition ARN, Windows instance id, private IP, 로컬 절대 경로, SSM command id는 이 문서에 기록하지 않았다.
+- 인접 MS(View, MarketConnector, StrategyExecution, StrategyDecision, Research, Preprocessor, Step Functions, EventBridge Scheduler, Lambda) 내부 구현 상세, DB after-check row 단위 결과, 일회성 실행 로그는 이번 반영에서 제외했다.
+
 ## 2026-05-27
 
 ### Changed
