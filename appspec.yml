@@ -1,0 +1,19 @@
+version: 0.0
+os: windows
+
+files:
+  - source: \
+    destination: C:\portfolio\codedeploy-candidate\port-interest-crawler
+
+hooks:
+  BeforeInstall:
+    - location: .devops/scripts/deploy/windows-before-install.ps1
+      timeout: 300
+
+  AfterInstall:
+    - location: .devops/scripts/deploy/windows-after-install.ps1
+      timeout: 600
+
+  ValidateService:
+    - location: .devops/scripts/deploy/windows-validate.ps1
+      timeout: 600

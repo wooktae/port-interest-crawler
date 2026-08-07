@@ -32,6 +32,10 @@ REQUIRED_FILES = {
     "interest_shortsell.py",
     "requirements.txt",
     "ops/run_krx_worker_daily.ps1",
+    "appspec.yml",
+    ".devops/scripts/deploy/windows-before-install.ps1",
+    ".devops/scripts/deploy/windows-after-install.ps1",
+    ".devops/scripts/deploy/windows-validate.ps1",
     "deployment-manifest.json",
 }
 
