@@ -1,0 +1,114 @@
+version: 0.2
+
+env:
+  shell: bash
+  variables:
+    PUSH_ARTIFACT: "false"
+    ARTIFACT_BUCKET: ""
+    ARTIFACT_PREFIX: "crawler/windows"
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.13
+    commands:
+      - set -euo pipefail
+      - echo "=== VERIFY BUILD RUNTIME ==="
+      - python --version
+      - git --version
+      - aws --version
+
+  pre_build:
+    commands:
+      - set -euo pipefail
+      - echo "=== VERIFY SOURCE IDENTITY ==="
+      - SOURCE_SHA="${CODEBUILD_RESOLVED_SOURCE_VERSION}"
+      - |
+        if [ -z "${SOURCE_SHA}" ]; then
+          echo "SOURCE_SHA=EMPTY"
+          exit 10
+        fi
+      - SHORT_SHA="$(printf '%s' "${SOURCE_SHA}" | cut -c1-12)"
+      - echo "SOURCE_SHA=${SOURCE_SHA}"
+      - echo "SHORT_SHA=${SHORT_SHA}"
+      - echo "PUSH_ARTIFACT=${PUSH_ARTIFACT}"
+
+      - echo "=== RUN PYTHON COMPILE ==="
+      - python .devops/scripts/build/compile_check.py
+
+      - echo "=== VERIFY WINDOWS BUNDLE SOURCE CONTRACT ==="
+      - test -f .devops/bundle/windows-include.txt
+      - test -f ops/run_krx_worker_daily.ps1
+      - test -f requirements.txt
+      - echo "WINDOWS_BUNDLE_SOURCE_CONTRACT=SUCCESS"
+
+      - echo "QUALITY_GATE=SUCCESS"
+
+  build:
+    commands:
+      - set -euo pipefail
+      - echo "=== BUILD WINDOWS VERSIONED ZIP ==="
+      - python .devops/scripts/package/build_windows_bundle.py --expected-sha "${SOURCE_SHA}"
+
+      - BUNDLE_NAME="port-interest-crawler-windows-${SHORT_SHA}.zip"
+      - BUNDLE_PATH=".devops/artifacts/${BUNDLE_NAME}"
+
+      - |
+        if [ ! -f "${BUNDLE_PATH}" ]; then
+          echo "BUNDLE_FILE_MISSING=${BUNDLE_PATH}"
+          exit 20
+        fi
+
+      - echo "=== VERIFY WINDOWS BUNDLE CONTRACT ==="
+      - python .devops/scripts/test/verify_windows_bundle.py
+
+      - BUNDLE_SHA256="$(sha256sum "${BUNDLE_PATH}" | awk '{print $1}')"
+
+      - echo "BUNDLE_NAME=${BUNDLE_NAME}"
+      - echo "BUNDLE_PATH=${BUNDLE_PATH}"
+      - echo "BUNDLE_SHA256=${BUNDLE_SHA256}"
+      - echo "CRAWLER_WINDOWS_VERSIONED_ZIP_BUILD=SUCCESS"
+
+  post_build:
+    commands:
+      - set -euo pipefail
+
+      - |
+        if [ "${CODEBUILD_BUILD_SUCCEEDING:-0}" != "1" ]; then
+          echo "CRAWLER_CODEBUILD=FAILED_BEFORE_POST_BUILD"
+          exit 40
+        fi
+
+      - echo "=== OPTIONAL S3 WINDOWS ARTIFACT PUSH ==="
+
+      - |
+        if [ "${PUSH_ARTIFACT}" = "true" ]; then
+          if [ -z "${ARTIFACT_BUCKET}" ]; then
+            echo "ARTIFACT_BUCKET=EMPTY"
+            exit 30
+          fi
+
+          S3_KEY="${ARTIFACT_PREFIX}/${SOURCE_SHA}/${BUNDLE_NAME}"
+
+          aws s3 cp \
+            "${BUNDLE_PATH}" \
+            "s3://${ARTIFACT_BUCKET}/${S3_KEY}" \
+            --only-show-errors
+
+          aws s3api head-object \
+            --bucket "${ARTIFACT_BUCKET}" \
+            --key "${S3_KEY}" \
+            >/dev/null
+
+          echo "S3_ARTIFACT_KEY=${S3_KEY}"
+          echo "S3_ARTIFACT_PUSH=SUCCESS"
+        else
+          echo "S3_ARTIFACT_PUSH=SKIPPED"
+        fi
+
+      - echo "CRAWLER_CODEBUILD=SUCCESS"
+
+artifacts:
+  files:
+    - ".devops/artifacts/*.zip"
+  discard-paths: yes
