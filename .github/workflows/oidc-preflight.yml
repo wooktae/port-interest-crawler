@@ -1,0 +1,61 @@
+name: Crawler OIDC Preflight
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  oidc-preflight:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Inspect GitHub OIDC claims
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          RESPONSE="$(
+            curl -sS \
+              -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+              "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com"
+          )"
+
+          export OIDC_RESPONSE="${RESPONSE}"
+
+          python - <<'PY'
+          import base64
+          import json
+          import os
+
+          response = json.loads(os.environ["OIDC_RESPONSE"])
+          token = response["value"]
+
+          payload = token.split(".")[1]
+          payload += "=" * (-len(payload) % 4)
+
+          claims = json.loads(
+              base64.urlsafe_b64decode(
+                  payload.encode("ascii")
+              )
+          )
+
+          allowed = [
+              "sub",
+              "aud",
+              "repository",
+              "repository_id",
+              "repository_owner",
+              "repository_owner_id",
+              "ref",
+              "ref_type",
+              "workflow",
+          ]
+
+          for key in allowed:
+              print(f"{key.upper()}={claims.get(key)}")
+
+          print("CRAWLER_OIDC_CLAIM_PREFLIGHT=SUCCESS")
+          PY
