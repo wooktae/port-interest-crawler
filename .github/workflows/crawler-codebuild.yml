@@ -8,6 +8,11 @@ on:
         required: true
         default: false
         type: boolean
+      push_image:
+        description: Push the Crawler container image to ECR
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   id-token: write
@@ -29,6 +34,7 @@ jobs:
         env:
           PROJECT_NAME: portfolio-interest-crawler-build
           PUSH_ARTIFACT: ${{ inputs.push_artifact }}
+          PUSH_IMAGE: ${{ inputs.push_image }}
           SOURCE_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
@@ -39,6 +45,7 @@ jobs:
               --source-version "${SOURCE_SHA}" \
               --environment-variables-override \
                 name=PUSH_ARTIFACT,value="${PUSH_ARTIFACT}",type=PLAINTEXT \
+                name=PUSH_IMAGE,value="${PUSH_IMAGE}",type=PLAINTEXT \
               --query "build.id" \
               --output text
           )"

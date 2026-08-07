@@ -4,8 +4,11 @@ env:
   shell: bash
   variables:
     PUSH_ARTIFACT: "false"
+    PUSH_IMAGE: "false"
     ARTIFACT_BUCKET: ""
     ARTIFACT_PREFIX: "crawler/windows"
+    ECR_REPOSITORY: "portfolio-interest-crawler"
+    AWS_DEFAULT_REGION: "ap-northeast-2"
 
 phases:
   install:
@@ -17,6 +20,7 @@ phases:
       - python --version
       - git --version
       - aws --version
+      - docker --version
 
   pre_build:
     commands:
@@ -32,6 +36,8 @@ phases:
       - echo "SOURCE_SHA=${SOURCE_SHA}"
       - echo "SHORT_SHA=${SHORT_SHA}"
       - echo "PUSH_ARTIFACT=${PUSH_ARTIFACT}"
+      - echo "PUSH_IMAGE=${PUSH_IMAGE}"
+      - echo "ECR_REPOSITORY=${ECR_REPOSITORY}"
 
       - echo "=== RUN PYTHON COMPILE ==="
       - python .devops/scripts/build/compile_check.py
@@ -42,11 +48,19 @@ phases:
       - test -f requirements.txt
       - echo "WINDOWS_BUNDLE_SOURCE_CONTRACT=SUCCESS"
 
+      - echo "=== VERIFY CONTAINER SOURCE CONTRACT ==="
+      - test -f Dockerfile
+      - test -f .dockerignore
+      - test -f interest_crawler_daily_nongui.py
+      - python -m py_compile interest_crawler_daily_nongui.py
+      - echo "CRAWLER_NONGUI_SOURCE_CONTRACT=SUCCESS"
+
       - echo "QUALITY_GATE=SUCCESS"
 
   build:
     commands:
       - set -euo pipefail
+
       - echo "=== BUILD WINDOWS VERSIONED ZIP ==="
       - python .devops/scripts/package/build_windows_bundle.py --expected-sha "${SOURCE_SHA}"
 
@@ -68,6 +82,27 @@ phases:
       - echo "BUNDLE_PATH=${BUNDLE_PATH}"
       - echo "BUNDLE_SHA256=${BUNDLE_SHA256}"
       - echo "CRAWLER_WINDOWS_VERSIONED_ZIP_BUILD=SUCCESS"
+
+      - echo "=== BUILD CRAWLER CONTAINER IMAGE ==="
+      - ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+      - ECR_URI="${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${ECR_REPOSITORY}"
+      - IMAGE_TAG="${SHORT_SHA}"
+      - IMAGE_URI="${ECR_URI}:${IMAGE_TAG}"
+      - echo "ECR_URI=${ECR_URI}"
+      - echo "IMAGE_TAG=${IMAGE_TAG}"
+      - echo "IMAGE_URI=${IMAGE_URI}"
+
+      - docker build --pull -t "${IMAGE_URI}" .
+
+      - echo "=== VERIFY CONTAINER NONGUI CONTRACT ==="
+      - |
+        docker run --rm \
+          --entrypoint python \
+          "${IMAGE_URI}" \
+          -m py_compile /app/interest_crawler_daily_nongui.py
+
+      - echo "CRAWLER_CONTAINER_BUILD=SUCCESS"
+      - echo "CRAWLER_CONTAINER_NONGUI_CONTRACT=SUCCESS"
 
   post_build:
     commands:
@@ -104,6 +139,47 @@ phases:
           echo "S3_ARTIFACT_PUSH=SUCCESS"
         else
           echo "S3_ARTIFACT_PUSH=SKIPPED"
+        fi
+
+      - echo "=== OPTIONAL ECR CONTAINER IMAGE PUSH ==="
+
+      - |
+        if [ "${PUSH_IMAGE}" = "true" ]; then
+          ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+          ECR_URI="${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${ECR_REPOSITORY}"
+          IMAGE_TAG="${SHORT_SHA}"
+          IMAGE_URI="${ECR_URI}:${IMAGE_TAG}"
+
+          echo "PUBLISH_IMAGE_URI=${IMAGE_URI}"
+
+          aws ecr get-login-password \
+            --region "${AWS_DEFAULT_REGION}" |
+            docker login \
+              --username AWS \
+              --password-stdin \
+              "${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
+
+          docker push "${IMAGE_URI}"
+
+          IMAGE_DIGEST="$(
+            aws ecr describe-images \
+              --region "${AWS_DEFAULT_REGION}" \
+              --repository-name "${ECR_REPOSITORY}" \
+              --image-ids imageTag="${IMAGE_TAG}" \
+              --query "imageDetails[0].imageDigest" \
+              --output text
+          )"
+
+          if [ -z "${IMAGE_DIGEST}" ] || [ "${IMAGE_DIGEST}" = "None" ]; then
+            echo "IMAGE_DIGEST=EMPTY"
+            exit 50
+          fi
+
+          echo "IMAGE_URI=${IMAGE_URI}"
+          echo "IMAGE_DIGEST=${IMAGE_DIGEST}"
+          echo "ECR_IMAGE_PUSH=SUCCESS"
+        else
+          echo "ECR_IMAGE_PUSH=SKIPPED"
         fi
 
       - echo "CRAWLER_CODEBUILD=SUCCESS"
