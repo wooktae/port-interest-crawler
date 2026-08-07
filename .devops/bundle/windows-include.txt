@@ -1,0 +1,12 @@
+# Crawler Windows KRX Worker deployment bundle
+
+db_config.py
+interest_get_holidays.py
+interest_krx_chrome.py
+interest_krx_login_new.py
+interest_krx_raw_validate_daily.py
+interest_log_format.py
+interest_program.py
+interest_shortsell.py
+requirements.txt
+ops/run_krx_worker_daily.ps1
