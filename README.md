@@ -78,7 +78,9 @@ Crawler는 GUI 의존 여부에 따라 두 실행 표면으로 분리한다.
 | 항목 | 값 |
 | --- | --- |
 | Entrypoint | `interest_crawler_daily_nongui.py` |
-| 실행 후보 | Container · ECS Fargate RunTask |
+| 운영 실행 | ECS Fargate RunTask · non-GUI |
+| 실행 계약 | Task Definition command `interest_crawler_daily_nongui.py` |
+| 배포 identity | Git SHA image tag · immutable ECR digest |
 | 주요 원천 | Naver · yfinance · 휴일 API |
 | DB 처리 | PostgreSQL upsert |
 | 제외 | KRX login · program · shortsell |
@@ -86,15 +88,20 @@ Crawler는 GUI 의존 여부에 따라 두 실행 표면으로 분리한다.
 
 non-GUI entrypoint는 KRX GUI 의존 모듈을 import하지 않는다.
 
+Dockerfile 기본 CMD가 아니라 ECS Task Definition의 explicit command가 운영 실행 계약이다.
+
+운영 orchestration은 검증된 Task Definition revision을 참조한다.
+
 ### Windows KRX Worker
 
 | 항목 | 값 |
 | --- | --- |
-| 환경 | Windows GUI session |
-| 실행 후보 | Scheduled Task |
+| 환경 | Windows EC2 · GUI session |
+| 운영 실행 | Scheduled Task |
 | Browser | Selenium · Chrome |
 | 수집 | KRX program · shortsell |
 | 처리 | login · CSV download · parse · upsert |
+| 배포 | versioned S3 ZIP · CodeDeploy IN_PLACE |
 | 후속 | KRX raw validation |
 
 Windows GUI 의존 흐름을 container의 기본 실행 경로로 합치지 않는다.
@@ -380,11 +387,29 @@ $env:INTEREST_DB_PASSWORD="[REDACTED]"
 
 ## AWS와 Windows 운영
 
+### Hybrid DevOps 요약
+
+| 항목 | 값 |
+| --- | --- |
+| Source | GitHub main |
+| CI | GitHub Actions OIDC → CodeBuild |
+| ECS Artifact | Git SHA image tag · immutable ECR digest |
+| ECS Runtime | Fargate RunTask · non-GUI |
+| Windows Artifact | Git SHA versioned ZIP · S3 object version |
+| Windows Runtime | Windows EC2 · Scheduled Task |
+| Windows Deploy | CodeDeploy IN_PLACE |
+| Promotion | Candidate 검증 후 운영 reference 반영 |
+| Rollback | ECS revision rollback · Windows runtime restore |
+
+Windows artifact publish와 Container image publish의 gate는 서로 독립적이다.
+
+Build와 Publish를 구분하며, Build-only에서는 외부 artifact publish가 일어나지 않는다.
+
 ### AWS
 
-non-GUI Crawler는 container 또는 ECS Fargate RunTask 후보 실행 단위다.
+non-GUI Crawler는 ECS Fargate RunTask로 운영한다.
 
-Scheduler와 Step Functions는 실행 시각과 orchestration을 담당한다.
+Scheduler와 Step Functions는 실행 시각과 orchestration을 담당하며, 운영 orchestration은 검증된 Task Definition revision을 참조한다.
 
 Crawler 문서에서는 state machine 전체 정의와 외부 리소스 상태를 다루지 않는다.
 

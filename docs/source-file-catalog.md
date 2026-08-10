@@ -210,6 +210,36 @@ Scheduled Task용 GUI 수집 wrapper이며 non-GUI Daily 경로와 분리한다.
 
 wrapper가 실행 중 생성하는 인라인 DB validator는 임시 산출물로 실행 후 제거한다.
 
+## DevOps와 Deployment
+
+| 파일 | 역할 |
+| --- | --- |
+| `Dockerfile` | Container image build |
+| `.dockerignore` | Git · cache · `.devops/artifacts/` build context 제외 |
+| `.github/workflows/crawler-codebuild.yml` | OIDC로 Crawler CodeBuild 시작 · publish gate 전달 |
+| `.github/workflows/oidc-preflight.yml` | GitHub OIDC claim 확인용 preflight |
+| `.devops/buildspec/buildspec.yml` | 공통 gate · Windows ZIP · Container build · 선택 publish |
+| `.devops/bundle/windows-include.txt` | Windows Worker bundle 포함 범위 |
+| `.devops/scripts/build/compile_check.py` | 안전한 Python compile gate |
+| `.devops/scripts/package/build_windows_bundle.py` | Git SHA 기반 deterministic Windows ZIP 생성 |
+| `.devops/scripts/test/verify_windows_bundle.py` | manifest · forbidden file · bundle contract 검증 |
+| `.devops/scripts/deploy/windows-before-install.ps1` | CodeDeploy BeforeInstall lifecycle hook |
+| `.devops/scripts/deploy/windows-after-install.ps1` | CodeDeploy AfterInstall lifecycle hook |
+| `.devops/scripts/deploy/windows-validate.ps1` | CodeDeploy ValidateService lifecycle hook |
+
+### 변경 시 확인
+
+| 항목 | 값 |
+| --- | --- |
+| 실행 계약 | Docker 기본 CMD와 ECS Task Definition command 책임 구분 |
+| Publish gate | `PUSH_ARTIFACT`와 `PUSH_IMAGE` 독립성 유지 |
+| Build context | build output을 Container context에 넣지 않음 |
+| Windows bundle | runtime secret · local env loader 제외 |
+| Lifecycle hook | Candidate staging · runtime promotion · validation 책임 분리 |
+| 민감정보 | credential · token 원문 문서 기록 금지 |
+
+`.devops/artifacts/*.zip`, `__pycache__`, `*.pyc`와 임시 backup은 catalog에 포함하지 않는다.
+
 ## Universe와 Sector
 
 | 파일 | 역할 |

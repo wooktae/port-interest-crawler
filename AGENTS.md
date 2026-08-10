@@ -239,21 +239,25 @@ Crawler는 GUI 의존 여부에 따라 두 실행 표면으로 분리한다.
 | 항목 | 기준 |
 | --- | --- |
 | Entrypoint | `interest_crawler_daily_nongui.py` |
-| 실행 후보 | Container · ECS Fargate RunTask |
+| 운영 실행 | ECS Fargate RunTask · non-GUI |
+| 실행 계약 | ECS Task Definition의 explicit command |
 | 포함 | Naver · yfinance · 휴일 확인 · DB 적재 |
 | 제외 | KRX GUI login · program · shortsell |
 | 책임 | non-GUI 원천 수집과 raw 적재 |
 
 non-GUI entrypoint에 Selenium, Chrome과 GUI KRX 수집을 다시 결합하지 않는다.
 
+Dockerfile 기본 CMD가 아니라 ECS Task Definition command가 운영 실행 계약이다.
+
 ### 3.2 Windows KRX Worker
 
 | 항목 | 기준 |
 | --- | --- |
-| 환경 | Windows GUI |
-| 실행 후보 | Scheduled Task |
+| 환경 | Windows EC2 · GUI |
+| 운영 실행 | Scheduled Task |
 | 수집 | KRX program · shortsell |
 | 처리 | 로그인 · CSV 다운로드 · parse · upsert |
+| 배포 | versioned S3 ZIP · CodeDeploy IN_PLACE |
 | 후속 | KRX raw validation |
 
 Windows worker의 GUI 의존 코드를 container 경로로 옮기지 않는다.
@@ -517,9 +521,28 @@ Crawler는 `preprocessor`, `research`, `decision`, `execution`의 비즈니스 �
 
 ## 10. AWS와 Windows 운영 기준
 
+### 10.0 Hybrid DevOps 기준
+
+- Crawler CI는 GitHub Actions OIDC로 CodeBuild를 시작한다.
+- GitHub OIDC Role은 CodeBuild 시작·조회 역할이며 Deploy 권한을 갖지 않는다.
+- 동일 Source에서 Windows artifact와 Container image를 함께 build할 수 있다.
+- Windows artifact publish와 Container image publish의 gate는 독립적이다.
+- Build와 Publish를 구분하고, Build-only에서 외부 artifact publish가 일어나지 않게 한다.
+- Container image는 Git SHA tag로 추적하고 배포 시 immutable digest 사용을 우선한다.
+- `.devops/artifacts` 같은 build output을 Container build context에 넣지 않는다.
+- Windows bundle에 runtime secret과 local env loader를 포함하지 않는다.
+
 ### 10.1 AWS
 
-non-GUI Crawler는 container 또는 ECS Fargate RunTask 후보 실행 단위다.
+non-GUI Crawler는 ECS Fargate RunTask로 운영한다.
+
+- ECS Task Definition의 explicit command가 운영 entrypoint 계약이다.
+- Container 경로에 KRX GUI 의존성을 넣지 않는다.
+- ECS Candidate는 실제 수집과 DB write 없이 artifact·runtime contract를 검증할 수 있어야 한다.
+- 운영 승격은 Candidate 성공 뒤에만 수행한다.
+- ECS rollback은 이전 Task Definition revision reference 복구가 기본이다.
+- rollback 후 검증된 Candidate를 re-promotion할 수 있어야 한다.
+- 실패한 Candidate를 운영에 승격하지 않는다.
 
 실제 cluster, task definition ARN과 Scheduler 상태는 외부 운영 사실이다.
 
@@ -535,6 +558,14 @@ Windows KRX worker는 GUI session과 Scheduled Task에 의존할 수 있다.
 - 기존 CSV와 신규 CSV를 구분한다.
 - Scheduled Task exit code를 확인한다.
 - KST timezone을 명시한다.
+
+Windows 배포는 versioned S3 artifact와 CodeDeploy lifecycle을 기준으로 한다.
+
+- Candidate 검증은 운영 Runtime과 Scheduler를 변경하지 않아야 한다.
+- 검증된 Candidate Runtime만 운영 Runtime으로 승격한다.
+- Windows rollback은 배포 전 runtime backup 복구가 기본이다.
+- rollback 후 검증된 Candidate를 re-promotion할 수 있어야 한다.
+- Windows EC2에는 artifact read 전용 최소 S3 권한만 부여한다.
 
 실제 Scheduled Task 실행은 사용자 요청 없이 수행하지 않는다.
 

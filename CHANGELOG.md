@@ -13,6 +13,67 @@ port-interest-crawler 코드와 문서의 주요 변경 이력을 기록한다.
 | 실행 기록 | 실제 수행한 검증만 기록 |
 | 민감정보 | credential · host · ARN · command id 원문 금지 |
 
+## 2026-08-07 — Crawler Hybrid DevOps 구성
+
+### Added
+
+| 항목 | 값 |
+| --- | --- |
+| CI | GitHub Actions OIDC → CodeBuild 실행 |
+| 공통 gate | Python compile · Source SHA identity 검증 |
+| Windows artifact | Git SHA versioned ZIP pipeline |
+| Windows bundle | deterministic ZIP · manifest · file hash contract |
+| Windows publish | versioned S3 artifact publish |
+| Windows deploy | CodeDeploy IN_PLACE · Candidate staging · lifecycle validation |
+| Container artifact | Docker build · Git SHA 기반 ECR image |
+| Publish gate | 독립 `PUSH_ARTIFACT` · `PUSH_IMAGE` gate |
+| ECS Task Definition | immutable image digest 기반 구성 |
+| ECS Candidate | standalone Fargate RunTask 검증 |
+| ECS 승격 | Candidate 성공 후 운영 reference 반영 |
+| ECS rollback | 이전 revision reference 복구와 re-promotion |
+
+### Changed
+
+| 항목 | 값 |
+| --- | --- |
+| non-GUI Daily | 운영 실행 단위를 ECS Fargate RunTask로 확정 |
+| 실행 계약 | Docker 기본 CMD 유지 · ECS Task Definition explicit command로 nongui 실행 |
+| Windows KRX Worker | Scheduled Task · CodeDeploy 운영 경로로 확정 |
+| orchestration | 운영 orchestration은 검증된 Task Definition revision만 참조 |
+| Crawler CI | 단일 Windows artifact에서 Hybrid dual-runtime build로 확장 |
+| Build · Publish | Build와 Publish 분리, Windows·ECS deploy/rollback 독립성 확립 |
+| `README.md` | 실행 모델과 AWS/Windows 운영을 실제 Hybrid 구조로 현행화 |
+| `AGENTS.md` | Hybrid DevOps 기준과 ECS/Windows 승격·rollback 규칙 반영 |
+| `docs/source-file-catalog.md` | DevOps / Deployment 파일 책임 반영 |
+
+### Validation
+
+| 항목 | 결과 |
+| --- | --- |
+| Build-only quality gate | 성공 |
+| Build-only S3 · ECR publish 차단 | 검증 |
+| Container build · nongui compile contract | 성공 |
+| ECR image publish와 digest 확인 | 성공 |
+| ECS Candidate Exit Code 0 | 확인 |
+| Candidate 수집 · DB write | 없음 |
+| 운영 Task Definition 승격 | 성공 |
+| ECS revision rollback과 re-promotion | 성공 |
+| Windows Candidate · CodeDeploy | 성공 |
+| Windows Scheduled Task 실행 | 성공 |
+| KRX Login · Program · Shortsell | 성공 |
+| KRX raw validation | 성공 |
+| Windows rollback과 re-promotion | 성공 |
+
+### Security
+
+| 항목 | 결과 |
+| --- | --- |
+| credential 원문 신규 기록 | 없음 |
+| runtime secret artifact 포함 | 제외 |
+| Candidate 검증 중 수집 · DB write | 없음 |
+| Windows EC2 artifact 권한 | read-only 최소 권한 |
+| GitHub OIDC · CodeBuild 역할 | 불필요한 Deploy 권한 없음 |
+
 ## 2026-07-22 — Crawler 문서 기준 재정비
 
 ### Changed
