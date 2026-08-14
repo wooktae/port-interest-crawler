@@ -27,6 +27,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout release source
+        if: github.event_name == 'push'
+        uses: actions/checkout@v4
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -89,3 +92,15 @@ jobs:
                 ;;
             esac
           done
+      - name: Release Crawler ECS
+        if: github.event_name == 'push'
+        shell: pwsh
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+          AWS_REGION: ap-northeast-2
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          ./.devops/scripts/release-crawler-ecs.ps1 `
+            -SourceSha "$env:SOURCE_SHA" `
+            -Region "$env:AWS_REGION"

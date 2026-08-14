@@ -8,7 +8,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-chcp 65001 *> $null
+if ($IsWindows -or $env:OS -eq "Windows_NT") {
+    chcp 65001 *> $null
+}
+
 [Console]::InputEncoding  = [System.Text.UTF8Encoding]::new($false)
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
@@ -17,16 +20,16 @@ $Family        = "portfolio-paper-interest-crawler"
 $ContainerName = "interest-crawler"
 
 $RepoRoot = (
-    Resolve-Path (Join-Path $PSScriptRoot "..\..")
+    Resolve-Path (Join-Path $PSScriptRoot "../..")
 ).Path
 
 $ManifestPath = Join-Path `
     $RepoRoot `
-    ".devops\config\crawler-ecs-activation-scope.json"
+    ".devops/config/crawler-ecs-activation-scope.json"
 
 $ArtifactRoot = Join-Path `
     $RepoRoot `
-    ".devops\artifacts\crawler-ecs-release"
+    ".devops/artifacts/crawler-ecs-release"
 
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
@@ -208,14 +211,19 @@ try {
     # ------------------------------------------------------------
     # 2. Resolve all approved State Machine ARNs
     # ------------------------------------------------------------
-    $smList = Invoke-AwsJson `
+    $identity = Invoke-AwsJson `
         -Arguments @(
-            "stepfunctions",
-            "list-state-machines",
-            "--region", $Region,
+            "sts",
+            "get-caller-identity",
             "--output", "json"
         ) `
-        -Failure "STATE_MACHINE_LIST_FAILED"
+        -Failure "AWS_IDENTITY_RESOLVE_FAILED"
+
+    $AccountId = [string]$identity.Account
+
+    if ($AccountId -notmatch '^\d{12}$') {
+        throw "AWS_ACCOUNT_ID_INVALID"
+    }
 
     $ResolvedScope = @()
 
@@ -223,17 +231,17 @@ try {
         $name      = [string]$item.state_machine
         $stateName = [string]$item.state_name
 
-        $sm = @($smList.stateMachines) |
-            Where-Object { $_.name -eq $name } |
-            Select-Object -First 1
+        if ([string]::IsNullOrWhiteSpace($name)) {
+            throw "STATE_MACHINE_NAME_EMPTY"
+        }
 
-        if (-not $sm) {
-            throw "STATE_MACHINE_NOT_FOUND=$name"
+        if ([string]::IsNullOrWhiteSpace($stateName)) {
+            throw "STATE_NAME_EMPTY=$name"
         }
 
         $ResolvedScope += [PSCustomObject]@{
             Name      = $name
-            Arn       = [string]$sm.stateMachineArn
+            Arn       = "arn:aws:states:${Region}:${AccountId}:stateMachine:${name}"
             StateName = $stateName
         }
     }
@@ -323,31 +331,67 @@ try {
     $Digest = $null
     $ResolvedImageTag = $null
 
-    foreach ($tag in @($SourceSha.ToLowerInvariant(), $ShortSha)) {
-        $imageResultRaw = & aws ecr describe-images `
-            --region $Region `
-            --repository-name $EcrRepository `
-            --image-ids "imageTag=$tag" `
-            --output json 2>$null
+    # Read repository once and resolve Source SHA locally.
+    # This avoids PowerShell 5.1 terminating on ImageNotFound stderr
+    # when probing a non-existent full-SHA tag.
+    $imageResult = Invoke-AwsJson `
+        -Arguments @(
+            "ecr",
+            "describe-images",
+            "--region", $Region,
+            "--repository-name", $EcrRepository,
+            "--output", "json"
+        ) `
+        -Failure "ECR_DESCRIBE_IMAGES_FAILED"
 
-        if ($LASTEXITCODE -eq 0 -and $imageResultRaw) {
-            $imageResult = ($imageResultRaw -join "`n") | ConvertFrom-Json
+    $sourceShaLower = $SourceSha.ToLowerInvariant()
 
-            $candidateDigest = [string](
-                @($imageResult.imageDetails) |
-                Select-Object -First 1
-            ).imageDigest
+    $imageMatches = @(
+        @($imageResult.imageDetails) |
+        Where-Object {
+            $tags = @($_.imageTags)
 
-            if (-not [string]::IsNullOrWhiteSpace($candidateDigest)) {
-                $Digest = $candidateDigest
-                $ResolvedImageTag = $tag
-                break
-            }
+            (
+                $sourceShaLower -in $tags -or
+                $ShortSha -in $tags
+            )
         }
+    )
+
+    if ($imageMatches.Count -eq 0) {
+        throw "CANDIDATE_ECR_DIGEST_NOT_FOUND_FOR_SOURCE_SHA"
     }
 
-    if ([string]::IsNullOrWhiteSpace($Digest)) {
-        throw "CANDIDATE_ECR_DIGEST_NOT_FOUND_FOR_SOURCE_SHA"
+    $digests = @(
+        $imageMatches |
+        ForEach-Object { [string]$_.imageDigest } |
+        Where-Object {
+            -not [string]::IsNullOrWhiteSpace($_)
+        } |
+        Sort-Object -Unique
+    )
+
+    if ($digests.Count -ne 1) {
+        throw "CANDIDATE_ECR_DIGEST_COUNT_INVALID=$($digests.Count)"
+    }
+
+    $Digest = $digests[0]
+
+    $allMatchedTags = @(
+        $imageMatches |
+        ForEach-Object { @($_.imageTags) } |
+        ForEach-Object { $_ } |
+        Sort-Object -Unique
+    )
+
+    if ($ShortSha -in $allMatchedTags) {
+        $ResolvedImageTag = $ShortSha
+    }
+    elseif ($sourceShaLower -in $allMatchedTags) {
+        $ResolvedImageTag = $sourceShaLower
+    }
+    else {
+        throw "CANDIDATE_ECR_MATCHED_TAG_NOT_RESOLVED"
     }
 
     if ($Digest -notmatch '^sha256:[0-9a-fA-F]{64}$') {
@@ -783,6 +827,10 @@ catch {
                 )
             }
         }
+    }
+
+    if ([string]::IsNullOrWhiteSpace([string]$PrimaryError)) {
+        $PrimaryError = "<EMPTY_EXCEPTION_MESSAGE>"
     }
 
     Write-Host ""
