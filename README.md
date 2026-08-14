@@ -392,22 +392,33 @@ $env:INTEREST_DB_PASSWORD="[REDACTED]"
 | 항목 | 값 |
 | --- | --- |
 | Source | GitHub main |
+| Release trigger | main push 자동 · 수동 실행 |
 | CI | GitHub Actions OIDC → CodeBuild |
 | ECS Artifact | Git SHA image tag · immutable ECR digest |
 | ECS Runtime | Fargate RunTask · non-GUI |
 | Windows Artifact | Git SHA versioned ZIP · S3 object version |
 | Windows Runtime | Windows EC2 · Scheduled Task |
 | Windows Deploy | CodeDeploy IN_PLACE |
-| Promotion | Candidate 검증 후 운영 reference 반영 |
+| Promotion | Candidate 검증 후 Activation Scope reference 반영 |
 | Rollback | ECS revision rollback · Windows runtime restore |
+
+main push 이후 자동 Release 흐름은 아래 순서를 따른다.
+
+GitHub main push → CodeBuild/Test → ECR Image + Windows ZIP Publish → ECS side-effect-free Candidate → ECS Activation Scope Promotion → Windows CodeDeploy
 
 Windows artifact publish와 Container image publish의 gate는 서로 독립적이다.
 
 Build와 Publish를 구분하며, Build-only에서는 외부 artifact publish가 일어나지 않는다.
 
+GitHub OIDC Role은 CodeBuild orchestration과 제한된 Crawler Release control-plane 권한을 가지며, DB DML과 KRX 업무 실행 같은 Runtime business 권한은 갖지 않는다.
+
+상세 IAM, 실제 리소스 이름, ARN, Revision 번호와 Deployment ID는 이 문서에 기록하지 않고 port-devops에서 관리한다.
+
 ### AWS
 
 non-GUI Crawler는 ECS Fargate RunTask로 운영한다.
+
+ECS Release는 실제 수집이나 DB write 없이 side-effect-free Candidate를 먼저 수행하고, 성공 후 지정 Activation Scope의 Task Definition reference만 승격한다.
 
 Scheduler와 Step Functions는 실행 시각과 orchestration을 담당하며, 운영 orchestration은 검증된 Task Definition revision을 참조한다.
 
@@ -425,6 +436,8 @@ KRX worker는 GUI session과 Scheduled Task에 의존할 수 있다.
 | Timezone | Asia/Seoul |
 | Exit | Scheduled Task exit code |
 | Validation | KRX raw validation 후속 실행 |
+
+Windows Release는 CodeDeploy IN_PLACE로 runtime만 배포하며, Scheduled Task와 KRX GUI 업무 실행은 별도 책임으로 자동 실행하지 않는다. EC2가 running이면 상태를 유지하고, stopped이면 배포 동안만 시작한 뒤 완료 후 원래 상태로 복원한다.
 
 실제 AWS resource와 Windows task 실행은 사용자 요청 없이 수행하지 않는다.
 

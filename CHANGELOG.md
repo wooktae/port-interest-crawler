@@ -13,6 +13,47 @@ port-interest-crawler 코드와 문서의 주요 변경 이력을 기록한다.
 | 실행 기록 | 실제 수행한 검증만 기록 |
 | 민감정보 | credential · host · ARN · command id 원문 금지 |
 
+## 2026-08-14 — Crawler Main Push Hybrid 자동배포 완성
+
+### Added
+
+| 항목 | 값 |
+| --- | --- |
+| 자동 Release | main push 기반 Crawler Hybrid automatic release |
+| ECS release | `release-crawler-ecs.ps1` |
+| Windows release | `release-crawler-windows.ps1` |
+| ECS 흐름 | side-effect-free Candidate 후 Activation Scope 자동 Promotion |
+| Windows 흐름 | versioned S3 artifact 기반 CodeDeploy 자동 실행 |
+
+### Changed
+
+| 항목 | 값 |
+| --- | --- |
+| GitHub Actions | Build/Publish 이후 ECS → Windows Release까지 수행 |
+| GitHub OIDC Role | 제한된 Release control-plane 권한까지 확장 |
+| 책임 분리 | Windows 배포와 Scheduled Task 업무 실행 책임 분리 명확화 |
+
+### Validation
+
+| 항목 | 결과 |
+| --- | --- |
+| 신규 commit main push E2E | 성공 |
+| CodeBuild | 성공 |
+| ECS Candidate Exit Code | 0 |
+| Activation Scope Promotion | 성공 |
+| Windows CodeDeploy | 성공 |
+| EC2 running 상태 유지 | 확인 |
+| Scheduled Task · KRX GUI 자동 실행 | 없음 |
+
+### Security
+
+| 항목 | 결과 |
+| --- | --- |
+| SSM SendCommand 사용 | 없음 |
+| Release 과정 DB write | 없음 |
+| runtime secret artifact 포함 | 없음 |
+| ARN · Account ID · Instance ID · credential 원문 기록 | 없음 |
+
 ## 2026-08-07 — Crawler Hybrid DevOps 구성
 
 ### Added

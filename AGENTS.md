@@ -524,7 +524,12 @@ Crawler는 `preprocessor`, `research`, `decision`, `execution`의 비즈니스 �
 ### 10.0 Hybrid DevOps 기준
 
 - Crawler CI는 GitHub Actions OIDC로 CodeBuild를 시작한다.
-- GitHub OIDC Role은 CodeBuild 시작·조회 역할이며 Deploy 권한을 갖지 않는다.
+- main push는 `crawler-codebuild.yml`을 자동 실행해 Hybrid Release를 orchestration한다.
+- GitHub OIDC Role은 CodeBuild orchestration과 제한된 Crawler Release control-plane 권한을 가진다.
+- OIDC Role이 Deploy 권한을 전혀 갖지 않는다고 표현하지 않는다.
+- OIDC Role을 DB DML이나 KRX 업무 실행 같은 Runtime business 권한으로 확대하지 않는다.
+- ECR·S3 artifact write는 CodeBuild 역할과 기존 Publish 경계를 유지한다.
+- 상세 IAM Action·Resource, ARN과 Policy JSON은 이 문서에 기록하지 않고 port-devops 책임으로 남긴다.
 - 동일 Source에서 Windows artifact와 Container image를 함께 build할 수 있다.
 - Windows artifact publish와 Container image publish의 gate는 독립적이다.
 - Build와 Publish를 구분하고, Build-only에서 외부 artifact publish가 일어나지 않게 한다.
@@ -532,13 +537,31 @@ Crawler는 `preprocessor`, `research`, `decision`, `execution`의 비즈니스 �
 - `.devops/artifacts` 같은 build output을 Container build context에 넣지 않는다.
 - Windows bundle에 runtime secret과 local env loader를 포함하지 않는다.
 
+main push Hybrid Release 흐름은 아래 순서를 기본으로 한다.
+
+| 단계 | 내용 |
+| --- | --- |
+| Trigger | main push 또는 수동 실행 |
+| Build | CodeBuild · Test |
+| Publish | ECR Image · Windows ZIP |
+| ECS | side-effect-free Candidate 후 Activation Scope Promotion |
+| Windows | versioned S3 ZIP 기반 CodeDeploy |
+
+Release control-plane은 artifact·runtime 배포 경계이며 실제 Crawler 수집·주문 업무 실행이 아니다.
+
 ### 10.1 AWS
 
 non-GUI Crawler는 ECS Fargate RunTask로 운영한다.
 
 - ECS Task Definition의 explicit command가 운영 entrypoint 계약이다.
 - Container 경로에 KRX GUI 의존성을 넣지 않는다.
-- ECS Candidate는 실제 수집과 DB write 없이 artifact·runtime contract를 검증할 수 있어야 한다.
+- ECS Candidate는 실제 수집과 DB write 없이 artifact·runtime contract를 검증한다.
+- Candidate command는 nongui entrypoint의 compile-only runtime contract 검증이다.
+- Candidate Exit Code 0 이후 신규 Task Definition revision을 등록한다.
+- 지정된 운영 Activation Scope의 Task Definition reference만 승격한다.
+- 승격 시 stale promotion guard를 적용한다.
+- 부분 승격 실패 시 이전 definition으로 rollback 가능한 구조를 유지한다.
+- Release 과정에서 실제 Crawler 수집이나 DB write를 실행하지 않는다.
 - 운영 승격은 Candidate 성공 뒤에만 수행한다.
 - ECS rollback은 이전 Task Definition revision reference 복구가 기본이다.
 - rollback 후 검증된 Candidate를 re-promotion할 수 있어야 한다.
@@ -559,13 +582,22 @@ Windows KRX worker는 GUI session과 Scheduled Task에 의존할 수 있다.
 - Scheduled Task exit code를 확인한다.
 - KST timezone을 명시한다.
 
-Windows 배포는 versioned S3 artifact와 CodeDeploy lifecycle을 기준으로 한다.
+Windows 배포는 versioned S3 artifact와 CodeDeploy IN_PLACE lifecycle을 기준으로 한다.
 
 - Candidate 검증은 운영 Runtime과 Scheduler를 변경하지 않아야 한다.
 - 검증된 Candidate Runtime만 운영 Runtime으로 승격한다.
 - Windows rollback은 배포 전 runtime backup 복구가 기본이다.
 - rollback 후 검증된 Candidate를 re-promotion할 수 있어야 한다.
 - Windows EC2에는 artifact read 전용 최소 S3 권한만 부여한다.
+
+Windows Release control-plane은 아래 실행 경계를 유지한다.
+
+- Release 자체는 Scheduled Task를 자동 실행하지 않는다.
+- Release 자체는 KRX GUI와 Selenium 수집을 실행하지 않는다.
+- Release는 SSM SendCommand를 사용하지 않는다.
+- EC2가 running이면 running 상태를 유지한다.
+- EC2가 stopped이면 배포를 위해 시작하고 완료 후 원래 stopped 상태로 복원한다.
+- 실제 KRX 업무 실행 책임은 기존 Windows Scheduled Task에 남는다.
 
 실제 Scheduled Task 실행은 사용자 요청 없이 수행하지 않는다.
 

@@ -216,9 +216,12 @@ wrapper가 실행 중 생성하는 인라인 DB validator는 임시 산출물로
 | --- | --- |
 | `Dockerfile` | Container image build |
 | `.dockerignore` | Git · cache · `.devops/artifacts/` build context 제외 |
-| `.github/workflows/crawler-codebuild.yml` | OIDC로 Crawler CodeBuild 시작 · publish gate 전달 |
+| `.github/workflows/crawler-codebuild.yml` | main push에서 CodeBuild/Publish 후 ECS와 Windows Release를 orchestration |
 | `.github/workflows/oidc-preflight.yml` | GitHub OIDC claim 확인용 preflight |
 | `.devops/buildspec/buildspec.yml` | 공통 gate · Windows ZIP · Container build · 선택 publish |
+| `.devops/scripts/release-crawler-ecs.ps1` | immutable ECR image Candidate · Task Definition 등록 · Activation Scope Promotion · stale guard · rollback |
+| `.devops/scripts/release-crawler-windows.ps1` | versioned S3 ZIP 기반 CodeDeploy · EC2 lifecycle 상태 보존 · Scheduled Task/KRX GUI 비실행 |
+| `.devops/config/crawler-ecs-activation-scope.json` | ECS 승격 대상 Activation Scope 정의 |
 | `.devops/bundle/windows-include.txt` | Windows Worker bundle 포함 범위 |
 | `.devops/scripts/build/compile_check.py` | 안전한 Python compile gate |
 | `.devops/scripts/package/build_windows_bundle.py` | Git SHA 기반 deterministic Windows ZIP 생성 |
