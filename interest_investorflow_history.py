@@ -22,7 +22,7 @@ HEADERS = {
 
 SOURCE = "naver"
 SOURCE_VERSION = "1.0.0"
-START_YEAR = 2023
+START_YEAR = 2024
 
 
 def get_conn():
