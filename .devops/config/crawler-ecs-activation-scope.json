@@ -1,0 +1,34 @@
+{
+    "schema_version":  1,
+    "task_definition_family":  "portfolio-paper-interest-crawler",
+    "activation_scope":  [
+                             {
+                                 "state_machine":  "portfolio-paper-daily-step1-17-approval",
+                                 "state_name":  "Step2A_RunInterestCrawlerNongui"
+                             },
+                             {
+                                 "state_machine":  "portfolio-paper-daily-step1-11-safe",
+                                 "state_name":  "Step2A_RunInterestCrawlerNongui"
+                             },
+                             {
+                                 "state_machine":  "portfolio-paper-daily-step1-step2a",
+                                 "state_name":  "Step2A_RunInterestCrawlerNonGui"
+                             },
+                             {
+                                 "state_machine":  "portfolio-paper-daily-step1-step2a-step2b",
+                                 "state_name":  "Step2A_RunInterestCrawlerNonGui"
+                             },
+                             {
+                                 "state_machine":  "portfolio-paper-daily-step1-step2a-step2b-step3",
+                                 "state_name":  "Step2A_RunInterestCrawlerNonGui"
+                             },
+                             {
+                                 "state_machine":  "portfolio-paper-daily-step1-step2a-step2b-step3-step4-step5",
+                                 "state_name":  "Step2A_RunInterestCrawlerNongui"
+                             },
+                             {
+                                 "state_machine":  "portfolio-paper-daily-step2a-only",
+                                 "state_name":  "Step2A_RunInterestCrawlerNonGui"
+                             }
+                         ]
+}

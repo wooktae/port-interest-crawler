@@ -1,6 +1,10 @@
 name: Crawler CodeBuild
 
 on:
+  push:
+    branches:
+      - main
+
   workflow_dispatch:
     inputs:
       push_artifact:
@@ -33,8 +37,8 @@ jobs:
         shell: bash
         env:
           PROJECT_NAME: portfolio-interest-crawler-build
-          PUSH_ARTIFACT: ${{ inputs.push_artifact }}
-          PUSH_IMAGE: ${{ inputs.push_image }}
+          PUSH_ARTIFACT: ${{ github.event_name == 'push' && 'true' || inputs.push_artifact || 'false' }}
+          PUSH_IMAGE: ${{ github.event_name == 'push' && 'true' || inputs.push_image || 'false' }}
           SOURCE_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
