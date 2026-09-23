@@ -14,6 +14,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 import psycopg2
 from db_config import get_db_config
+from interest_locale import t
 import re
 import json
 from datetime import date
@@ -111,7 +112,7 @@ def run():
     tables = soup.find_all("table")
 
     if len(tables) < 2:
-        print("❌ 데이터 테이블 없음")
+        print(t("❌ No data table", "❌ 데이터 테이블 없음"))
         return
 
     target_table = tables[1]
@@ -121,7 +122,7 @@ def run():
     periods = re.findall(r"\d{4}\.\d{2}\.", table_text)
     periods = list(dict.fromkeys(periods))
 
-    print("📅 기간:", periods)
+    print(t("📅 Period:", "📅 기간:"), periods)
 
     rows = target_table.find_all("tr")
 
@@ -235,7 +236,7 @@ def run():
     cur.close()
     conn.close()
 
-    print("✅ interest_ticker_finance_raw 저장 완료")
+    print(t("✅ interest_ticker_finance_raw save complete", "✅ interest_ticker_finance_raw 저장 완료"))
 
 
 if __name__ == "__main__":

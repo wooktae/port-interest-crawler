@@ -7,6 +7,7 @@ Because it involves external web requests and DB upserts, run it only during the
 import requests
 import psycopg2
 from db_config import get_db_config
+from interest_locale import t
 import json
 import time
 from datetime import datetime, date, timezone
@@ -90,7 +91,7 @@ def run():
         "source_version": SOURCE_VERSION
     }
 
-    print("📌 파싱 결과:")
+    print(t("📌 Parsing result:", "📌 파싱 결과:"))
     print({
         "forward_eps": record["forward_eps"],
         "forward_per": record["forward_per"],
@@ -153,7 +154,7 @@ def run():
     cur.close()
     conn.close()
 
-    print("✅ interest_ticker_value_raw 저장 완료")
+    print(t("✅ interest_ticker_value_raw save complete", "✅ interest_ticker_value_raw 저장 완료"))
 
 
 if __name__ == "__main__":

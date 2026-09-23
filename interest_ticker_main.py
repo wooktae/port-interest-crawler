@@ -8,6 +8,7 @@ import requests
 import yfinance as yf
 import psycopg2
 from db_config import get_db_config
+from interest_locale import t
 import json
 import time
 from datetime import datetime, timezone
@@ -140,7 +141,7 @@ def run():
         "source_version": SOURCE_VERSION,
     }
 
-    print("📌 파싱 결과:")
+    print(t("📌 Parsing result:", "📌 파싱 결과:"))
     print({
         "company_name": record["company_name"],
         "current_price": record["current_price"],
@@ -202,7 +203,7 @@ def run():
     cur.close()
     conn.close()
 
-    print("✅ interest_ticker_main_raw 저장 완료")
+    print(t("✅ interest_ticker_main_raw save complete", "✅ interest_ticker_main_raw 저장 완료"))
 
 
 if __name__ == "__main__":

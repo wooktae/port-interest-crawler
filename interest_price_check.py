@@ -9,6 +9,7 @@ from db_config import get_db_config
 from datetime import datetime, timedelta
 
 from interest_get_holidays import is_holiday
+from interest_locale import t
 
 
 DB_CONFIG = get_db_config()
@@ -118,7 +119,7 @@ def run():
 
         # None at all
         if not exist_codes:
-            print(f"[MISSING DATE] {d} → 전체 없음 ({len(universe)} 종목)")
+            print(t(f"[MISSING DATE] {d} → none at all ({len(universe)} tickers)", f"[MISSING DATE] {d} → 전체 없음 ({len(universe)} 종목)"))
             missing_date_count += 1
             missing_ticker_total += len(universe)
 
@@ -127,7 +128,7 @@ def run():
             missing_cnt = len(missing_codes)
 
             if missing_cnt >= PARTIAL_THRESHOLD:
-                print(f"[PARTIAL] {d} → {missing_cnt}개 누락")
+                print(t(f"[PARTIAL] {d} → {missing_cnt} missing", f"[PARTIAL] {d} → {missing_cnt}개 누락"))
                 print(f"  sample: {list(missing_codes)[:5]}")
                 missing_ticker_total += missing_cnt
 
