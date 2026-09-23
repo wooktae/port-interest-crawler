@@ -1,7 +1,7 @@
-"""KRX 웹에서 공매도 데이터를 과거 기간 기준으로 backfill하는 Selenium 스크립트다.
+"""Selenium script that backfills short-selling data from the KRX website over a past date range.
 
-종목별 CSV 다운로드와 파싱 후 PostgreSQL 저장을 수행한다.
-대량 다운로드와 DB 쓰기가 발생할 수 있으므로 실행 전 대상 universe와 로컬 다운로드 경로를 확인한다.
+It downloads and parses per-ticker CSVs and then stores them in PostgreSQL.
+Because it can trigger heavy downloads and DB writes, confirm the target universe and local download path before running.
 """
 
 import os
@@ -80,7 +80,7 @@ def get_universe(conn):
 
 
 # ---------------------------
-# 이미 받은 종목
+# Already collected tickers
 # ---------------------------
 
 def get_collected_tickers(conn):
@@ -223,7 +223,7 @@ def insert_db(df):
 
 
 # ---------------------------
-# CSV 클릭 (팝업)
+# Click CSV (popup)
 # ---------------------------
 
 def click_csv_popup(driver, wait):
@@ -295,7 +295,7 @@ def run():
 
             before = snapshot_csv()
 
-            # 검색
+            # Search
             search_btn = wait.until(
                 EC.element_to_be_clickable((By.ID, "jsSearchButton"))
             )
@@ -305,7 +305,7 @@ def run():
             print("search wait 7 sec")
             time.sleep(SEARCH_WAIT)
 
-            # 다운로드 버튼
+            # Download button
             download_btn = wait.until(
                 EC.element_to_be_clickable(
                     (By.CSS_SELECTOR, "img[title*='다운로드']")
@@ -314,7 +314,7 @@ def run():
 
             download_btn.click()
 
-            # CSV 클릭
+            # Click CSV
             click_csv_popup(driver, wait)
 
             print("csv wait 7 sec")

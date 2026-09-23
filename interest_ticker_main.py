@@ -1,7 +1,7 @@
-"""Naver/yfinance 기반 관심종목 기본 정보를 수집하는 스크립트다.
+"""Script that collects basic information for target tickers based on Naver/yfinance.
 
-DB universe를 기준으로 Naver API성 데이터와 yfinance 정보를 조회해 기본 속성을 저장한다.
-외부 요청과 DB upsert가 포함되므로 운영 수집 단계에서만 실행한다.
+Using the DB universe, it queries Naver API-style data and yfinance information and stores the basic attributes.
+Because it involves external requests and DB upserts, run it only during the production collection stage.
 """
 
 import requests
@@ -26,7 +26,7 @@ def get_conn():
 
 
 # -----------------------------
-# 네이버 totalInfos 파싱
+# Parse Naver totalInfos
 # -----------------------------
 def extract_from_total_infos(data, target_code):
     total_infos = data.get("totalInfos", [])
@@ -37,7 +37,7 @@ def extract_from_total_infos(data, target_code):
 
 
 # -----------------------------
-# 숫자 문자열 정리
+# Clean up numeric strings
 # -----------------------------
 def parse_number(value):
     if not value:
@@ -48,7 +48,7 @@ def parse_number(value):
     value = value.replace("%", "")
     value = value.replace("배", "").strip()
 
-    # 시총 "104조 2,217억" 처리
+    # Handle market cap such as "104조 2,217억"
     if "조" in value:
         trillion_part = value.split("조")[0]
         remainder = value.split("조")[1]
@@ -94,7 +94,7 @@ def fetch_with_retry(url, retries=3):
 
 
 # -----------------------------
-# 메인 실행
+# Main execution
 # -----------------------------
 def run():
     print("===== interest_ticker_main OPTIMIZED =====")
@@ -108,7 +108,7 @@ def run():
     yf_ticker = yf.Ticker(YF_TICKER)
     info = yf_ticker.info
 
-    # 네이버 totalInfos 기반 추출
+    # Extract based on Naver totalInfos
     last_price = extract_from_total_infos(naver_int, "lastClosePrice")
     market_value = extract_from_total_infos(naver_int, "marketValue")
     foreign_rate = extract_from_total_infos(naver_int, "foreignRate")
@@ -134,7 +134,7 @@ def run():
             "yfinance_info": info
         }, ensure_ascii=False),
 
-        # ✅ 최적화 반영
+        # optimization applied
         "as_of_ts": datetime.now(timezone.utc),
         "source": SOURCE,
         "source_version": SOURCE_VERSION,

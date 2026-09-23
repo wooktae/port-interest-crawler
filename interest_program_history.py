@@ -1,7 +1,7 @@
-"""KRX 웹에서 프로그램 매매 데이터를 과거 기간 기준으로 backfill하는 Selenium 스크립트다.
+"""Selenium script that backfills program trading data from the KRX website over a past date range.
 
-기간별 CSV 다운로드와 파싱 후 PostgreSQL 저장을 수행한다.
-대량 다운로드와 DB 쓰기가 발생할 수 있으므로 실행 전 기간과 로컬 다운로드 경로를 확인한다.
+It downloads and parses per-date CSVs and then stores them in PostgreSQL.
+Because it can trigger heavy downloads and DB writes, confirm the date range and local download path before running.
 """
 
 import os
@@ -199,7 +199,7 @@ def parse_csv(file_path, date):
 
 
 # ---------------------------
-# CSV 다운로드
+# CSV download
 # ---------------------------
 
 def download_csv(driver):
@@ -214,7 +214,7 @@ def download_csv(driver):
 
     download_btn.click()
 
-    # 데이터 없음 팝업 처리
+    # Handle the "no data" popup
     try:
 
         close_btn = WebDriverWait(driver,3).until(
@@ -257,7 +257,7 @@ def download_csv(driver):
 
 
 # ---------------------------
-# 날짜 생성
+# Generate dates
 # ---------------------------
 
 def generate_dates():

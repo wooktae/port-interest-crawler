@@ -1,7 +1,7 @@
-"""Naver 기반 관심종목 valuation 데이터를 수집하는 스크립트다.
+"""Script that collects valuation data for target tickers based on Naver.
 
-종목별 valuation 원천 데이터를 요청하고 필요한 값을 파싱해 PostgreSQL에 저장한다.
-외부 웹 요청과 DB upsert가 포함되므로 운영 수집 단계에서만 실행한다.
+It requests per-ticker valuation source data, parses the required values, and stores them in PostgreSQL.
+Because it involves external web requests and DB upserts, run it only during the production collection stage.
 """
 
 import requests
@@ -64,13 +64,13 @@ def run():
     integration_url = f"https://m.stock.naver.com/api/stock/{TICKER_CODE}/integration"
     data = fetch_with_retry(integration_url)
 
-    # totalInfos 영역
+    # totalInfos section
     forward_eps = extract_from_total_infos(data, "cnsEps")
     forward_per = extract_from_total_infos(data, "cnsPer")
     dividend_yield = extract_from_total_infos(data, "dividendYieldRatio")
     dps = extract_from_total_infos(data, "dividend")
 
-    # consensusInfo 영역
+    # consensusInfo section
     consensus = data.get("consensusInfo", {})
     analyst_point = consensus.get("recommMean")
     target_price_avg = consensus.get("priceTargetMean")

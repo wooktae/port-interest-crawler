@@ -1,13 +1,13 @@
-"""interest 데이터 일일 수집 단계를 순서대로 실행하는 운영 orchestration 후보 스크립트다.
+"""Operational orchestration candidate script that runs the interest data daily collection steps in order.
 
-KRX 로그인, 뉴스, 가격, 수급, 공매도 등 여러 수집 모듈의 run 함수를 호출한다.
-실행 시 외부 요청, Selenium/Chrome, DB 쓰기가 연쇄적으로 발생하므로 운영 환경에서만 사용한다.
+It calls the run functions of several collection modules such as KRX login, news, price, investor flow, and short selling.
+When run, external requests, Selenium/Chrome, and DB writes occur in a chain, so use it only in the operational environment.
 """
 
 from datetime import datetime
 import time
 
-# 각 모듈 import
+# Import each module
 import interest_krx_login_new
 import interest_news
 import interest_agency
@@ -50,7 +50,7 @@ def run_step(name, func):
 
 
 def main():
-    """일일 수집 모듈을 정해진 순서로 실행하고 단계별 결과를 요약한다."""
+    """Run the daily collection modules in the defined order and summarize the per-step results."""
 
     print("=" * 100)
     print("INTEREST DAILY ORCHESTRATION")
@@ -87,7 +87,7 @@ def main():
     results.append(run_step("interest_marketbreadth", interest_marketbreadth.run))
 
     # -----------------------------
-    # 5. KRX 로그인
+    # 5. KRX login
     # -----------------------------
     results.append(run_step("krx_login", interest_krx_login_new.run))
     time.sleep(2)

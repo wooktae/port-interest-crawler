@@ -1,14 +1,14 @@
-"""interest 수집 스크립트의 PostgreSQL 접속 설정을 공통으로 만든다.
+"""Provides shared PostgreSQL connection settings for the interest collection scripts.
 
-DB 접속값은 환경변수에서 읽고, 실제 password 값은 코드나 문서에 남기지 않는다.
-각 수집/검증 스크립트는 이 모듈을 통해 동일한 DB 기본값과 search_path를 사용한다.
+DB connection values are read from environment variables, and the actual password value is never left in code or documentation.
+Each collection/validation script uses the same DB defaults and search_path through this module.
 """
 
 import os
 
 
 def get_db_config():
-    """환경변수 기반 DB 접속 설정과 interest 우선 search_path를 반환한다."""
+    """Return the environment-variable-based DB connection settings and an interest-first search_path."""
     password = os.getenv("INTEREST_DB_PASSWORD", "")
     if not password:
         raise RuntimeError("INTEREST_DB_PASSWORD environment variable is required")

@@ -1,7 +1,7 @@
-"""yfinance 기반 해외지수 가격 데이터를 일일 증분 수집하는 스크립트다.
+"""Script that collects yfinance-based foreign index price data as daily increments.
 
-지수별 최신 적재일 이후 구간을 조회하고 JSON-safe 값으로 정리해 PostgreSQL에 저장한다.
-yfinance 외부 요청과 DB upsert가 포함되므로 운영 수집 단계에서만 실행한다.
+It queries the period after the latest loaded date per index, normalizes the values to JSON-safe values, and saves them to PostgreSQL.
+Because it includes yfinance external requests and DB upserts, run it only in the operational collection step.
 """
 
 import yfinance as yf
@@ -156,13 +156,13 @@ def fetch_index_rows(index_name, ticker, start_date, end_date):
 
         rows = []
 
-        today = datetime.now().date()   # 🔥 추가
+        today = datetime.now().date()   # 🔥 added
 
         for _, r in df.iterrows():
 
             trade_date = r["Date"].date()
 
-            # 🔥 오늘 데이터 제거 (핵심)
+            # 🔥 remove today's data (core)
             if trade_date >= today:
                 continue
 
@@ -301,7 +301,7 @@ def run():
             if not rows:
                 continue
 
-            # 🔥 1. 휴일 제거
+            # 🔥 1. remove holidays
             rows = [
                 r for r in rows
                 if not is_holiday(r["date"], "US")
@@ -310,7 +310,7 @@ def run():
             if not rows:
                 continue
 
-            # 🔥 2. EXISTS 제거 (핵심)
+            # 🔥 2. remove via EXISTS (core)
             final_rows = [
                 r for r in rows
                 if not exists_in_db(conn, r["index_name"], r["date"])

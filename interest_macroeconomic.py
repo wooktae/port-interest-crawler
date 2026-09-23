@@ -1,7 +1,7 @@
-"""yfinance 기반 매크로 지표 데이터를 일일 증분 수집하는 스크립트다.
+"""Script that collects yfinance-based macroeconomic indicator data as daily increments.
 
-국가/지표별 최신 적재 기간 이후 데이터를 조회하고 PostgreSQL에 저장한다.
-yfinance 외부 요청과 DB upsert가 포함되므로 운영 수집 단계에서만 실행한다.
+It queries data after the latest loaded period per country/indicator and saves it to PostgreSQL.
+Because it includes yfinance external requests and DB upserts, run it only in the operational collection step.
 """
 
 import yfinance as yf
@@ -206,7 +206,7 @@ def run():
 
     try:
 
-        from interest_get_holidays import is_holiday  # 🔥 추가
+        from interest_get_holidays import is_holiday  # 🔥 added
 
         for indicator_name, ticker in MACRO_TICKERS.items():
 
@@ -221,7 +221,7 @@ def run():
             if not rows:
                 continue
 
-            # 🔥 1. 휴일 제거 (US 기준)
+            # 🔥 1. remove holidays (US basis)
             rows = [
                 r for r in rows
                 if not is_holiday(r["period"], "US")
@@ -230,14 +230,14 @@ def run():
             if not rows:
                 continue
             
-            # 🔥 여기 추가
+            # 🔥 added here
             today = datetime.now().date()
             rows = [
                 r for r in rows
                 if r["period"] < today
 ]
 
-            # 🔥 2. EXISTS 제거 (핵심)
+            # 🔥 2. remove via EXISTS (core)
             final_rows = [
                 r for r in rows
                 if not exists_in_db(conn, r["indicator_name"], r["period"])

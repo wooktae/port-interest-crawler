@@ -1,7 +1,7 @@
-"""관심종목 가격 데이터의 누락 여부를 확인하는 check 스크립트다.
+"""Check script that verifies whether watchlist price data is missing.
 
-DB universe와 price 테이블을 읽어 최근 영업일 기준 미수집 종목을 출력한다.
-휴일 판정과 DB 읽기가 포함되며, 저장 로직은 수행하지 않는 점검 용도다.
+It reads the DB universe and price table and prints the uncollected tickers based on the recent business day.
+It includes holiday determination and DB reads, and is for inspection only; it does not perform any save logic.
 """
 
 import psycopg2
@@ -17,7 +17,7 @@ START_DATE = datetime(2022, 1, 1).date()
 PARTIAL_THRESHOLD = 60
 
 
-# 🔥 KRX 실제 휴일 보정 (핵심)
+# 🔥 KRX actual holiday correction (core)
 KRX_EXTRA_HOLIDAYS = {
     # 2022
     datetime(2022, 3, 9).date(),
@@ -109,14 +109,14 @@ def run():
 
     while d < today:
 
-        # 🔥 완벽 휴일 제거
+        # 🔥 fully remove holidays
         if is_krx_holiday(d):
             d += timedelta(days=1)
             continue
 
         exist_codes = existing_map.get(d, set())
 
-        # 전체 없음
+        # None at all
         if not exist_codes:
             print(f"[MISSING DATE] {d} → 전체 없음 ({len(universe)} 종목)")
             missing_date_count += 1

@@ -1,7 +1,7 @@
-"""Naver 금융 화면에서 관심종목 재무제표 데이터를 수집하는 Selenium 스크립트다.
+"""Selenium script that collects financial statement data for target tickers from Naver Finance screens.
 
-Chrome/ChromeDriver로 재무 페이지를 열고 BeautifulSoup으로 표 데이터를 파싱해 PostgreSQL에 저장한다.
-외부 웹 요청과 DB upsert가 포함되므로 운영 수집 단계에서만 실행한다.
+It opens the finance page with Chrome/ChromeDriver, parses the table data with BeautifulSoup, and stores it in PostgreSQL.
+Because it involves external web requests and DB upserts, run it only during the production collection stage.
 """
 
 from selenium import webdriver
@@ -19,7 +19,7 @@ import json
 from datetime import date
 
 # =========================================
-# 설정
+# Settings
 # =========================================
 
 DB_CONFIG = get_db_config()
@@ -33,7 +33,7 @@ SOURCE_VERSION = "1.0.0"
 
 
 # =========================================
-# DB 연결
+# DB connection
 # =========================================
 
 def get_conn():
@@ -41,7 +41,7 @@ def get_conn():
 
 
 # =========================================
-# 숫자 정리
+# Number cleanup
 # =========================================
 
 def parse_number(text):
@@ -59,11 +59,11 @@ def parse_number(text):
 
 
 # =========================================
-# 분기 문자열 → 날짜 변환
+# Convert quarter string -> date
 # =========================================
 
 def convert_period_to_date(period_str):
-    # "2025.06." → 2025-06-30
+    # "2025.06." -> 2025-06-30
     year = int(period_str[:4])
     month = int(period_str[5:7])
 
@@ -78,13 +78,13 @@ def convert_period_to_date(period_str):
 
 
 # =========================================
-# 메인 실행
+# Main execution
 # =========================================
 
 def run():
     print("===== NAVER FINANCE → DB INSERT START (OPTIMIZED) =====")
 
-    # 1️⃣ Selenium 실행
+    # 1) Launch Selenium
     options = Options()
     options.add_argument("--headless=new")
     options.add_argument("--disable-gpu")
@@ -106,7 +106,7 @@ def run():
     html = driver.execute_script("return document.documentElement.outerHTML;")
     driver.quit()
 
-    # 2️⃣ BeautifulSoup 파싱
+    # 2) BeautifulSoup parsing
     soup = BeautifulSoup(html, "html.parser")
     tables = soup.find_all("table")
 
@@ -116,7 +116,7 @@ def run():
 
     target_table = tables[1]
 
-    # 3️⃣ 날짜 추출
+    # 3) Extract dates
     table_text = target_table.get_text()
     periods = re.findall(r"\d{4}\.\d{2}\.", table_text)
     periods = list(dict.fromkeys(periods))
@@ -143,7 +143,7 @@ def run():
             if idx < len(values):
                 result[period][item_name] = parse_number(values[idx])
 
-    # 4️⃣ DB 저장 (UPSERT + source/version + collected_at)
+    # 4) Save to DB (UPSERT + source/version + collected_at)
     conn = get_conn()
     cur = conn.cursor()
 

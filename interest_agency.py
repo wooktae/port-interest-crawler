@@ -1,7 +1,7 @@
-"""Naver 증권 리서치/증권사 의견 데이터를 일일 증분 수집하는 스크립트다.
+"""Script that incrementally collects Naver Finance research / brokerage opinion data on a daily basis.
 
-Naver 웹 페이지를 요청해 리포트 상세 정보를 파싱하고 PostgreSQL에 upsert한다.
-외부 요청과 DB 쓰기가 포함되므로 운영 수집 단계에서만 실행한다.
+It requests Naver web pages, parses report detail information, and upserts it into PostgreSQL.
+Because it involves external requests and DB writes, run it only during the production collection stage.
 """
 
 import requests
@@ -200,7 +200,7 @@ def save_record(cur, record):
             target_price = EXCLUDED.target_price,
             raw_json = EXCLUDED.raw_json,
             updated_at = now();
-    """, record)   # 🔥 이거 반드시 있어야 함
+    """, record)   # This is required and must be present
 
     return True
 
@@ -222,7 +222,7 @@ def run():
     fail_lines = []
 
     page = 1
-    stop = False   # 🔥 추가
+    stop = False   # added
 
     try:
         while True:
@@ -237,8 +237,8 @@ def run():
 
                     if latest_db_date and record["publish_date"]:
                         if record["publish_date"] < latest_db_date:
-                            stop = True   # 🔥 핵심
-                            break         # 🔥 for 탈출
+                            stop = True   # key condition
+                            break         # break out of the for loop
 
                     saved = save_record(cur, record)
 
@@ -258,7 +258,7 @@ def run():
             conn.commit()
 
             if stop:
-                break   # 🔥 while 탈출
+                break   # break out of the while loop
 
             page += 1
             time.sleep(PAGE_SLEEP_SEC)

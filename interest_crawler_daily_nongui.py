@@ -1,12 +1,12 @@
 """ECS/Fargate 전용 interest non-GUI daily crawler orchestration.
 
-KRX GUI 의존 단계는 포함하지 않는다.
-제외 대상:
+Does not include the KRX GUI-dependent steps.
+Excluded:
 - interest_krx_login_new
 - interest_program
 - interest_shortsell
 
-실행 시 외부 요청과 DB 쓰기가 발생하므로 paper 운영 환경에서만 사용한다.
+External requests and DB writes occur when run, so use it only in the paper operational environment.
 """
 
 from datetime import datetime

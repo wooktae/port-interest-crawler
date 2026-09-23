@@ -1,7 +1,7 @@
-"""일일 수집 후 핵심 테이블의 데이터 품질을 빠르게 점검하는 스크립트다.
+"""Script that quickly inspects the data quality of the core tables after daily collection.
 
-PostgreSQL 최신일, NULL, row count, 이상치, 중복 여부를 확인한다.
-휴일 판정 과정에서 외부 요청이 포함될 수 있으므로 운영 점검 목적일 때만 실행한다.
+It checks the PostgreSQL latest date, NULLs, row count, anomalies, and duplicates.
+External requests may be included during holiday determination, so run it only for operational inspection purposes.
 """
 
 import requests
@@ -166,7 +166,7 @@ def check_duplicates(conn):
 # MAIN
 # =========================================================
 def run():
-    """일일 validation 항목을 순서대로 실행하고 결과를 출력한다."""
+    """Run the daily validation items in order and print the results."""
     now = datetime.now(SEOUL_TZ)
     today = now.date()
     yesterday = today - timedelta(days=1)

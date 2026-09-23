@@ -1,7 +1,7 @@
-"""interest 데이터 전체 품질을 점검하는 validation 스크립트다.
+"""Validation script that inspects the overall quality of the interest data.
 
-PostgreSQL 테이블의 최신일, NULL, 중복, domain 값, gap, row count 등을 읽기 중심으로 검사한다.
-일부 휴일 판단에 외부 API 요청이 포함될 수 있으므로 문서화 작업 중에는 실행하지 않는다.
+It checks the latest date, NULLs, duplicates, domain values, gaps, row count, and so on of the PostgreSQL tables in a read-centric manner.
+Some holiday determinations may include external API requests, so it must not be run during documentation work.
 """
 
 import requests
@@ -31,7 +31,7 @@ PROGRAM_AMOUNT_TOLERANCE = 1_000_000
 
 # =========================================================
 # TABLE META
-# 첨부 파일 DDL 기준 + 컬럼 존재 여부 런타임 검증
+# Based on the attached-file DDL + runtime verification of column existence
 # =========================================================
 TABLE_SPECS = {
     "interest_news_raw": {
@@ -275,7 +275,7 @@ def validate_date(cur, conn):
                 log_error(table_name, f"NO DATA | expected={expected}")
                 continue
 
-            # 뉴스 / 기관은 오늘 데이터까지 수집 가능하므로 today 허용
+            # News / agency can collect data up to today, so today is allowed
             if table_name in ["interest_news_raw", "interest_agency_raw"]:
                 if latest >= expected:
                     log_ok(table_name, f"{latest} vs {expected} | today/latest allowed")
@@ -388,7 +388,7 @@ def validate_domain_generic(cur, conn, schema_cache):
             if col not in existing_cols:
                 continue
             try:
-                # WTI 2020-04-20 음수 유가 케이스 허용
+                # Allow the WTI 2020-04-20 negative oil price case
                 if table_name == "interest_commodity_raw" and col == "price" and "commodity_code" in existing_cols:
                     q = f"""
                         SELECT COUNT(*)
@@ -623,7 +623,7 @@ def validate_gap(cur, conn):
     kr = lambda d: get_holiday_info(d, "KR", cache)
     us = lambda d: get_holiday_info(d, "US", cache)
 
-    # 🔥 KRX 강제 휴일 (핵심)
+    # 🔥 KRX forced holidays (core)
     KRX_FORCE_HOLIDAYS = {
         date(2025, 12, 31),
         date(2026, 3, 2),
@@ -663,7 +663,7 @@ def validate_gap(cur, conn):
 
             while d <= end_dt:
                 if market == "KR":
-                    # 🔥 핵심 수정
+                    # 🔥 core fix
                     if d in KRX_FORCE_HOLIDAYS:
                         d += timedelta(days=1)
                         continue
@@ -676,7 +676,7 @@ def validate_gap(cur, conn):
 
                 d += timedelta(days=1)
 
-            # 실제 데이터
+            # Actual data
             q = f"""
                 SELECT DISTINCT {date_col}
                 FROM {table_name}
@@ -685,7 +685,7 @@ def validate_gap(cur, conn):
             actual_dates = execute_query(cur, conn, q, (start_dt, end_dt), fetch="all")
             actual_dates = {r[0] for r in actual_dates if r[0] is not None}
 
-            # gap 계산
+            # gap calculation
             missing = [d for d in expected_dates if d not in actual_dates]
             gap_count = len(missing)
 
@@ -836,7 +836,7 @@ def print_summary():
 # MAIN
 # =========================================================
 def run():
-    """DB schema cache를 만든 뒤 전체 validation 항목을 순차 실행한다."""
+    """Build the DB schema cache, then run all validation items in sequence."""
     print("\n" + "=" * 100)
     print("INTEREST DATA VALIDATION")
     print("=" * 100)

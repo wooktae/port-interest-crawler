@@ -1,7 +1,7 @@
-"""DB에 적재된 가격 데이터를 기반으로 market breadth를 일일 계산하는 스크립트다.
+"""Script that computes market breadth daily based on the price data loaded in the DB.
 
-외부 API 대신 PostgreSQL 가격 테이블을 조회해 상승/하락/이동평균 통계를 산출한다.
-결과 저장을 포함하므로 실행 시 DB 읽기와 쓰기 영향이 있다.
+Instead of an external API, it queries the PostgreSQL price table to derive advancer/decliner/moving-average statistics.
+Because it includes saving the results, there is a DB read and write impact when run.
 """
 
 import psycopg2
@@ -156,7 +156,7 @@ def save_rows(conn, records):
 
 
 # -----------------------------
-# run (🔥 여기서 로그 직접 찍는다)
+# run (🔥 logs are printed directly here)
 # -----------------------------
 def run():
 

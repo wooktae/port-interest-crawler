@@ -1,7 +1,7 @@
-"""stock universe의 sector/industry 정보를 yfinance 기준으로 보강하는 스크립트다.
+"""Script that enriches the sector/industry information of the stock universe based on yfinance.
 
-DB에서 universe와 매핑 정보를 읽고 yfinance 외부 요청으로 업종 정보를 조회한다.
-결과는 PostgreSQL reference/interest 계열 테이블에 갱신될 수 있으므로 실행 전 영향 범위를 확인한다.
+It reads the universe and mapping information from the DB and queries sector information via yfinance external requests.
+Because the results may update PostgreSQL reference/interest-family tables, confirm the impact scope before running.
 """
 
 import time
@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 
 DB_CONFIG = get_db_config()
 
-SLEEP_SEC = 0.25  # 야후 과호출 방지 (필요하면 0.5~1.0로)
+SLEEP_SEC = 0.25  # Avoid over-calling Yahoo (increase to 0.5~1.0 if needed)
 BATCH_COMMIT = 50
 
 
@@ -22,7 +22,7 @@ def get_conn():
 
 def load_sector_mapping(conn):
     """
-    sector_mapping(sector_en, sector_kr, sector_type) 기준으로 dict 구성
+    Builds dicts based on sector_mapping(sector_en, sector_kr, sector_type).
     """
     cur = conn.cursor()
     cur.execute("""
@@ -48,7 +48,7 @@ def load_sector_mapping(conn):
 
 def ensure_mapping_row(conn, en_value: str, sector_type: str):
     """
-    sector_mapping에 없으면 일단 INSERT (KR은 NULL) 해둠
+    If it is not in sector_mapping, INSERT it first (with KR as NULL).
     """
     if not en_value:
         return
@@ -63,29 +63,29 @@ def ensure_mapping_row(conn, en_value: str, sector_type: str):
 
 def to_yf_symbol(ticker_code: str, market: str | None):
     """
-    stock_universe.market 값에 따라 yfinance 심볼 생성
+    Generates the yfinance symbol based on the stock_universe.market value.
     - KOSPI/KS -> .KS
     - KOSDAQ/KQ -> .KQ
-    - 그 외는 기본 .KS (원하면 여기 로직 확장)
+    - Everything else defaults to .KS (extend the logic here if desired)
     """
     m = (market or "").upper().strip()
 
     if m in ("KOSDAQ", "KQ"):
         return f"{ticker_code}.KQ"
-    # KOSPI / KS / 기타는 KS로
+    # KOSPI / KS / others map to KS
     return f"{ticker_code}.KS"
 
 
 def translate_to_kr(sector_en, industry_en, sector_map, industry_map):
     """
-    sector + industry를 한글 array로 변환.
-    - 매핑에 없거나 kr이 NULL이면 제외(빈 배열 가능)
+    Converts sector + industry into a Korean array.
+    - Excluded if not in the mapping or if kr is NULL (an empty array is possible)
     """
     out = []
 
     if sector_en:
         kr = sector_map.get(sector_en)
-        if kr:  # NULL/""이면 제외
+        if kr:  # excluded if NULL/""
             out.append(kr)
 
     if industry_en:
@@ -102,11 +102,11 @@ def run():
     conn = get_conn()
     conn.autocommit = False
 
-    # 1) 매핑 로딩
+    # 1) Load the mapping
     sector_map, industry_map = load_sector_mapping(conn)
     print(f"Loaded mapping: sector={len(sector_map)}, industry={len(industry_map)}")
 
-    # 2) universe 종목 조회
+    # 2) Query the universe tickers
     cur = conn.cursor()
     cur.execute("""
         SELECT ticker_code, company_name, market
@@ -137,18 +137,18 @@ def run():
             time.sleep(SLEEP_SEC)
             continue
 
-        # 3) mapping에 없는 EN 값은 sector_mapping에 등록(kr=null)
+        # 3) EN values not in the mapping are registered in sector_mapping (kr=null)
         if sector_en and sector_en not in sector_map:
             ensure_mapping_row(conn, sector_en, "sector")
         if industry_en and industry_en not in industry_map:
             ensure_mapping_row(conn, industry_en, "industry")
 
-        # 4) 한글 array 만들기
+        # 4) Build the Korean array
         sector_kr_arr = translate_to_kr(sector_en, industry_en, sector_map, industry_map)
 
-        # (중요) 방금 INSERT한 새 매핑들은 dict에 반영 안 되므로,
-        # 이번 런에서는 KR이 아직 없으면 []로 들어가는 게 정상.
-        # 다음에 sector_mapping KR 채운 뒤 다시 돌리면 자동으로 채워짐.
+        # (Important) The newly INSERTed mappings are not reflected in the dict,
+        # so during this run it is normal for entries with no KR yet to become [].
+        # Once the sector_mapping KR values are filled in and it is run again, they fill automatically.
 
         try:
             cur2 = conn.cursor()
@@ -169,7 +169,7 @@ def run():
             time.sleep(SLEEP_SEC)
             continue
 
-        # 배치 커밋
+        # Batch commit
         if updated % BATCH_COMMIT == 0:
             conn.commit()
             committed += 1

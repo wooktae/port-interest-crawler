@@ -1,13 +1,13 @@
-"""KRX GUI worker 수집 후 program / shortsell raw 적재 여부를 검증한다.
+"""Validates whether program / shortsell raw were loaded after KRX GUI worker collection.
 
-Step 2 INTEREST_CRAWLER guard 전용 스크립트다.
-interest_program_raw / interest_shortsell_raw 의 expected trade_date row_count 와 max_date 를 확인한다.
+This is a script dedicated to the Step 2 INTEREST_CRAWLER guard.
+It checks the expected trade_date row_count and max_date of interest_program_raw / interest_shortsell_raw.
 
-사용 예:
+Usage examples:
     python interest_krx_raw_validate_daily.py --expected-date 2026-06-19
     python interest_krx_raw_validate_daily.py --run-date 2026-06-20
 
-실패 시 exit code 30 을 반환한다.
+On failure it returns exit code 30.
 """
 
 import argparse

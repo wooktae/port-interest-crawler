@@ -1,7 +1,7 @@
-"""Naver 금융의 종목별 투자자 수급 데이터를 일일 증분 수집하는 스크립트다.
+"""Script that incrementally collects per-ticker investor flow data from Naver Finance on a daily basis.
 
-관심 universe를 DB에서 읽고, 최근 영업일 대상 수급 테이블을 웹 요청으로 파싱해 저장한다.
-외부 요청과 DB upsert가 포함되므로 운영 수집 단계에서만 실행한다.
+It reads the target universe from the DB, then parses and stores the flow table for recent business days via web requests.
+Because it involves external requests and DB upserts, run it only during the production collection stage.
 """
 
 import requests
@@ -301,7 +301,7 @@ def run():
         session = requests.Session()
         cur = conn.cursor()
 
-        # 🔥 변경 핵심
+        # key change
         target_dates = generate_dates(conn)
 
         if not target_dates:
