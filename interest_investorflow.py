@@ -1,17 +1,20 @@
 """Script that incrementally collects per-ticker investor flow data from Naver Finance on a daily basis.
 
-It reads the target universe from the DB, then parses and stores the flow table for recent business days via web requests.
-Because it involves external requests and DB upserts, run it only during the production collection stage.
+It reads the target universe from the DB, fetches investor-flow data from the
+Naver Stock JSON API, and stores missing business-day records.
+
+Because it involves external requests and DB upserts, run it only during the
+production collection stage.
 """
 
-import requests
-from bs4 import BeautifulSoup
-import psycopg2
-from db_config import get_db_config
-import re
 import time
 from datetime import datetime, timedelta
 
+import psycopg2
+import requests
+
+from db_config import get_db_config
+from interest_get_holidays import is_holiday
 from interest_log_format import print_step_log
 
 
@@ -19,11 +22,18 @@ DB_CONFIG = get_db_config()
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0",
-    "Referer": "https://finance.naver.com/"
+    "Referer": "https://stock.naver.com/",
+    "Accept": "application/json, text/plain, */*",
 }
 
 SOURCE = "naver"
-SOURCE_VERSION = "2.1.0"
+SOURCE_VERSION = "3.0.0"
+
+API_URL = (
+    "https://stock.naver.com/api/domestic/detail/"
+    "{ticker}/trend"
+    "?tradeType=KRX&startIdx=0&pageSize=50"
+)
 
 
 def get_conn():
@@ -31,20 +41,22 @@ def get_conn():
 
 
 def get_tickers():
-
     conn = get_conn()
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT 
+        SELECT
             su.ticker_code,
             su.company_name,
             MAX(f.trade_date) AS last_date
         FROM stock_universe su
         LEFT JOIN interest_investorflow_raw f
-        ON su.ticker_code = f.ticker_code
-        GROUP BY su.ticker_code, su.company_name
-        ORDER BY su.ticker_code
+            ON su.ticker_code = f.ticker_code
+        GROUP BY
+            su.ticker_code,
+            su.company_name
+        ORDER BY
+            su.ticker_code
     """)
 
     rows = cur.fetchall()
@@ -54,8 +66,8 @@ def get_tickers():
 
     return rows
 
-def generate_dates(conn):
 
+def generate_dates(conn):
     cur = conn.cursor()
 
     cur.execute("""
@@ -78,147 +90,173 @@ def generate_dates(conn):
     while start <= end:
         if not is_holiday(start, "KR"):
             dates.append(start)
+
         start += timedelta(days=1)
 
     return dates
 
 
-def to_int(x):
-    if not x:
+def to_int(value):
+    if value is None or value == "":
         return None
-    x = x.replace(",", "").replace("+", "").strip()
+
     try:
-        return int(x)
-    except:
+        return int(str(value).replace(",", "").replace("+", "").strip())
+    except (TypeError, ValueError):
         return None
 
 
-def to_float(x):
-    if not x:
+def to_float(value):
+    if value is None or value == "":
         return None
-    x = x.replace("%", "").replace(",", "").strip()
+
     try:
-        return float(x)
-    except:
+        return float(
+            str(value)
+            .replace("%", "")
+            .replace(",", "")
+            .strip()
+        )
+    except (TypeError, ValueError):
         return None
 
 
-def request_html(session, url):
-
-    resp = session.get(url, headers=HEADERS, timeout=(5, 10))
-    resp.raise_for_status()
-
-    return resp.content.decode("euc-kr", errors="ignore")
-
-
-def parse_row(cols):
-
-    if not cols or len(cols) != 9:
+def calculate_change_rate(close_price, price_diff):
+    if close_price is None or price_diff is None:
         return None
 
-    date_str = cols[0].strip()
+    previous_close = close_price - price_diff
 
-    if not date_str or "." not in date_str:
+    if previous_close == 0:
         return None
 
-    trade_date = datetime.strptime(date_str, "%Y.%m.%d").date()
+    return round(
+        (price_diff / previous_close) * 100,
+        2
+    )
 
-    close_price = to_int(cols[1])
 
-    diff_raw = cols[2]
-    diff_num = to_int(re.sub(r"[^0-9]", "", diff_raw))
+def parse_item(item):
+    bizdate = item.get("bizdate")
 
-    if diff_num is None:
+    if not bizdate:
         return None
 
-    price_diff = -diff_num if "하락" in diff_raw else diff_num
+    try:
+        trade_date = datetime.strptime(
+            bizdate,
+            "%Y%m%d"
+        ).date()
+    except (TypeError, ValueError):
+        return None
+
+    close_price = to_int(item.get("closePrice"))
+    price_diff = to_int(item.get("prevChangePrice"))
 
     return {
         "trade_date": trade_date,
         "close_price": close_price,
         "price_diff": price_diff,
-        "price_change_rate": to_float(cols[3]),
-        "volume": to_int(cols[4]),
-        "institution_net": to_int(cols[5]),
-        "foreign_net": to_int(cols[6]),
-        "foreign_hold_shares": to_int(cols[7]),
-        "foreign_hold_ratio": to_float(cols[8])
+        "price_change_rate": calculate_change_rate(
+            close_price,
+            price_diff
+        ),
+        "volume": to_int(
+            item.get("tradeVolume")
+        ),
+        "institution_net": to_int(
+            item.get("organPureBuyQuant")
+        ),
+        "foreign_net": to_int(
+            item.get("foreignerPureBuyQuant")
+        ),
+        "foreign_hold_shares": to_int(
+            item.get("frgnStock")
+        ),
+        "foreign_hold_ratio": to_float(
+            item.get("frgnHoldRatio")
+        ),
     }
 
 
-def fetch_page(session, ticker, page):
+def fetch_rows(session, ticker):
+    url = API_URL.format(ticker=ticker)
 
-    url = f"https://finance.naver.com/item/frgn.naver?code={ticker}&page={page}"
+    response = session.get(
+        url,
+        headers=HEADERS,
+        timeout=(5, 10)
+    )
 
-    html = request_html(session, url)
-    soup = BeautifulSoup(html, "html.parser")
+    response.raise_for_status()
 
-    tables = soup.find_all("table", class_="type2")
+    payload = response.json()
 
-    if len(tables) < 2:
-        return []
+    if not isinstance(payload, list):
+        raise ValueError(
+            f"Unexpected Naver investor flow response "
+            f"for ticker={ticker}: "
+            f"type={type(payload).__name__}"
+        )
 
-    table = tables[1]
-    rows = table.find_all("tr")
+    records = []
 
-    data = []
+    for item in payload:
+        if not isinstance(item, dict):
+            continue
 
-    for row in rows:
-        cols = [c.get_text(strip=True) for c in row.find_all("td")]
-        record = parse_row(cols)
+        record = parse_item(item)
 
         if record:
-            data.append(record)
+            records.append(record)
 
-    return data
+    return records
 
 
 def save_batch(cur, ticker, records):
-
     for r in records:
-
         cur.execute("""
-        INSERT INTO interest_investorflow_raw (
-            ticker_code,
-            trade_date,
-            close_price,
-            price_diff,
-            price_change_rate,
-            volume,
-            institution_net,
-            foreign_net,
-            foreign_hold_shares,
-            foreign_hold_ratio,
-            source,
-            source_version,
-            collected_at
-        )
-        VALUES (
-            %(ticker)s,
-            %(trade_date)s,
-            %(close_price)s,
-            %(price_diff)s,
-            %(price_change_rate)s,
-            %(volume)s,
-            %(institution_net)s,
-            %(foreign_net)s,
-            %(foreign_hold_shares)s,
-            %(foreign_hold_ratio)s,
-            %(source)s,
-            %(source_version)s,
-            now()
-        )
-        ON CONFLICT (ticker_code, trade_date)
-        DO UPDATE SET
-            close_price = EXCLUDED.close_price,
-            price_diff = EXCLUDED.price_diff,
-            price_change_rate = EXCLUDED.price_change_rate,
-            volume = EXCLUDED.volume,
-            institution_net = EXCLUDED.institution_net,
-            foreign_net = EXCLUDED.foreign_net,
-            foreign_hold_shares = EXCLUDED.foreign_hold_shares,
-            foreign_hold_ratio = EXCLUDED.foreign_hold_ratio,
-            updated_at = now()
+            INSERT INTO interest_investorflow_raw (
+                ticker_code,
+                trade_date,
+                close_price,
+                price_diff,
+                price_change_rate,
+                volume,
+                institution_net,
+                foreign_net,
+                foreign_hold_shares,
+                foreign_hold_ratio,
+                source,
+                source_version,
+                collected_at
+            )
+            VALUES (
+                %(ticker)s,
+                %(trade_date)s,
+                %(close_price)s,
+                %(price_diff)s,
+                %(price_change_rate)s,
+                %(volume)s,
+                %(institution_net)s,
+                %(foreign_net)s,
+                %(foreign_hold_shares)s,
+                %(foreign_hold_ratio)s,
+                %(source)s,
+                %(source_version)s,
+                now()
+            )
+            ON CONFLICT (ticker_code, trade_date)
+            DO UPDATE SET
+                close_price = EXCLUDED.close_price,
+                price_diff = EXCLUDED.price_diff,
+                price_change_rate = EXCLUDED.price_change_rate,
+                volume = EXCLUDED.volume,
+                institution_net = EXCLUDED.institution_net,
+                foreign_net = EXCLUDED.foreign_net,
+                foreign_hold_shares = EXCLUDED.foreign_hold_shares,
+                foreign_hold_ratio = EXCLUDED.foreign_hold_ratio,
+                updated_at = now()
         """, {
             "ticker": ticker,
             "source": SOURCE,
@@ -226,53 +264,6 @@ def save_batch(cur, ticker, records):
             **r
         })
 
-
-from interest_get_holidays import is_holiday
-
-
-def get_recent_business_days(n=3):
-
-    days = []
-    d = datetime.now().date() - timedelta(days=1)
-
-    while len(days) < n:
-        if not is_holiday(d, "KR"):
-            days.append(d)
-        d -= timedelta(days=1)
-
-    return days
-
-
-def fetch_target_date_rows(session, ticker, target_date):
-
-    page = 1
-    results = []
-
-    while True:
-
-        rows = fetch_page(session, ticker, page)
-
-        if not rows:
-            break
-
-        stop = False
-
-        for r in rows:
-
-            if r["trade_date"] < target_date:
-                stop = True
-                break
-
-            if r["trade_date"] == target_date:
-                results.append(r)
-
-        if stop:
-            break
-
-        page += 1
-        time.sleep(0.1)
-
-    return results
 
 def get_existing_tickers_by_date(conn, target_date):
     cur = conn.cursor()
@@ -283,25 +274,30 @@ def get_existing_tickers_by_date(conn, target_date):
         WHERE trade_date = %s
     """, (target_date,))
 
-    rows = {r[0] for r in cur.fetchall()}
+    rows = {
+        r[0]
+        for r in cur.fetchall()
+    }
+
     cur.close()
 
     return rows
 
-def run():
 
+def run():
     conn = get_conn()
     tickers = get_tickers()
 
     collected_dates = set()
     success_map = {}
 
-    try:
+    session = None
+    cur = None
 
+    try:
         session = requests.Session()
         cur = conn.cursor()
 
-        # key change
         target_dates = generate_dates(conn)
 
         if not target_dates:
@@ -313,41 +309,74 @@ def run():
                 "failed_lines": [],
                 "error_count": 0
             }
-            print_step_log("interest_investorflow", result)
+
+            print_step_log(
+                "interest_investorflow",
+                result
+            )
+
             return result
 
+        target_date_set = set(target_dates)
+
+        existing_map = {
+            target_date: get_existing_tickers_by_date(
+                conn,
+                target_date
+            )
+            for target_date in target_dates
+        }
+
         for ticker, company, last_date in tickers:
+            needed_dates = {
+                target_date
+                for target_date in target_dates
+                if ticker not in existing_map[target_date]
+            }
 
-            for target_date in target_dates:
+            if not needed_dates:
+                continue
 
-                existing = get_existing_tickers_by_date(conn, target_date)
+            rows = fetch_rows(
+                session,
+                ticker
+            )
 
-                if ticker in existing:
-                    continue
+            target_rows = [
+                row
+                for row in rows
+                if row["trade_date"] in target_date_set
+                and row["trade_date"] in needed_dates
+            ]
 
-                rows = fetch_target_date_rows(session, ticker, target_date)
+            if not target_rows:
+                continue
 
-                if not rows:
-                    continue
+            save_batch(
+                cur,
+                ticker,
+                target_rows
+            )
 
-                save_batch(cur, ticker, rows)
+            for r in target_rows:
+                d = str(r["trade_date"])
 
-                for r in rows:
-                    d = str(r["trade_date"])
-                    collected_dates.add(d)
-                    success_map[d] = success_map.get(d, 0) + 1
+                collected_dates.add(d)
+
+                success_map[d] = (
+                    success_map.get(d, 0) + 1
+                )
+
+            time.sleep(0.05)
 
         conn.commit()
-
-        cur.close()
-        conn.close()
-        session.close()
 
         if not collected_dates:
             status = "NO_CHANGE"
             success_lines = []
         else:
             status = "SUCCESS"
+
             success_lines = [
                 f"{d} {success_map[d]} Investor Collected"
                 for d in sorted(collected_dates)
@@ -355,19 +384,24 @@ def run():
 
         result = {
             "status": status,
-            "collected_dates": sorted(collected_dates),
+            "collected_dates": sorted(
+                collected_dates
+            ),
             "success_lines": success_lines,
             "error_lines": [],
             "failed_lines": [],
             "error_count": 0
         }
 
-        print_step_log("interest_investorflow", result)
+        print_step_log(
+            "interest_investorflow",
+            result
+        )
+
         return result
 
     except Exception as e:
-
-        conn.close()
+        conn.rollback()
 
         result = {
             "status": "FAILED",
@@ -378,8 +412,21 @@ def run():
             "error_count": 0
         }
 
-        print_step_log("interest_investorflow", result)
+        print_step_log(
+            "interest_investorflow",
+            result
+        )
+
         return result
+
+    finally:
+        if cur is not None:
+            cur.close()
+
+        if session is not None:
+            session.close()
+
+        conn.close()
 
 
 if __name__ == "__main__":
