@@ -1,4 +1,4 @@
-"""ECS/Fargate 전용 interest non-GUI daily crawler orchestration.
+"""ECS/Fargate-specific non-GUI daily crawler orchestration.
 
 Does not include the KRX GUI-dependent steps.
 Excluded:

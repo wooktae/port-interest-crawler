@@ -363,7 +363,6 @@ Other MS internal code and documentation are not automatically included in the C
 | --- | --- |
 | `block_watch_backtest_run.py` | Direct relationship to operational collection needs confirmation |
 | `dump_public_schema_final.py` | DB dump · local file creation candidate |
-| `patch_research_decision_dependency.py` | One-time patch candidate outside Crawler responsibility |
 
 Do not run or delete cleanup candidates.
 

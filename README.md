@@ -178,7 +178,6 @@ Do not merge the Windows GUI-dependent flow into the container's default executi
 | --- | --- |
 | `dump_public_schema_final.py` | legacy · DB dump candidate |
 | `block_watch_backtest_run.py` | Local experiment candidate |
-| `patch_research_decision_dependency.py` | One-time patch candidate |
 
 Do not delete candidate files based on static verification alone.
 
