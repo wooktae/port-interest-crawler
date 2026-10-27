@@ -1,7 +1,7 @@
-"""KRX 웹에서 공매도 데이터를 일일 증분 수집하는 Selenium 스크립트다.
+"""Selenium script that incrementally collects short-selling data from the KRX website on a daily basis.
 
-시장별 CSV를 다운로드해 universe 종목으로 필터링하고 PostgreSQL에 저장한다.
-브라우저 제어, 파일 다운로드, DB upsert가 포함되므로 운영 환경에서만 실행한다.
+It downloads per-market CSVs, filters them to the universe tickers, and stores them in PostgreSQL.
+Because it involves browser control, file downloads, and DB upserts, run it only in the production environment.
 """
 
 import os

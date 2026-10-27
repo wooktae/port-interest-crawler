@@ -1,7 +1,7 @@
-"""yfinance 기반 원자재 가격 데이터를 일일 증분 수집하는 스크립트다.
+"""Script that collects yfinance-based commodity price data as daily increments.
 
-원자재별 최신 적재일을 확인한 뒤 필요한 기간만 조회해 PostgreSQL에 저장한다.
-yfinance 외부 요청과 DB upsert가 포함되므로 문서화/분석 중에는 실행하지 않는다.
+After checking the latest loaded date per commodity, it queries only the necessary period and saves it to PostgreSQL.
+Because it includes yfinance external requests and DB upserts, it must not be run during documentation/analysis.
 """
 
 import yfinance as yf
@@ -119,13 +119,13 @@ def fetch_commodity_rows(commodity_code, ticker, start_date, end_date):
 
         rows = []
 
-        today = datetime.now().date()  # 🔥 추가
+        today = datetime.now().date()  # 🔥 added
 
         for _, r in df.iterrows():
 
             trade_date = r["Date"].date()
 
-            # 🔥 오늘 데이터 제거
+            # 🔥 remove today's data
             if trade_date >= today:
                 continue
 
@@ -212,7 +212,7 @@ def run():
 
     try:
 
-        from interest_get_holidays import is_holiday  # 🔥 추가
+        from interest_get_holidays import is_holiday  # 🔥 added
 
         for commodity_code, ticker in COMMODITY_MAP.items():
 
@@ -227,7 +227,7 @@ def run():
             if not rows:
                 continue
 
-            # 🔥 1. 휴일 제거 (US 기준)
+            # 🔥 1. remove holidays (US basis)
             rows = [
                 r for r in rows
                 if not is_holiday(r["date"], "US")
@@ -236,7 +236,7 @@ def run():
             if not rows:
                 continue
 
-            # 🔥 2. EXISTS 제거 (핵심)
+            # 🔥 2. remove via EXISTS (core)
             final_rows = [
                 r for r in rows
                 if not exists_in_db(conn, r["commodity_code"], r["date"])

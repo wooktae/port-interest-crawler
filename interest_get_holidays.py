@@ -1,7 +1,7 @@
-"""시장 휴일 여부를 조회하는 공통 보조 모듈이다.
+"""Common helper module that queries whether a given date is a market holiday.
 
-Nager.Date API를 호출해 국가별 공휴일을 가져오고, KRX/US 시장 휴일 판정에 사용된다.
-외부 API 요청이 포함되므로 호출하는 validation/수집 스크립트 실행 시 네트워크 영향이 있다.
+It calls the Nager.Date API to fetch public holidays per country and is used for KRX/US market holiday determination.
+Because it includes external API requests, there is a network impact when the calling validation/collection scripts run.
 """
 
 import requests
@@ -9,7 +9,7 @@ from datetime import datetime, date
 
 HOLIDAY_API_BASE = "https://date.nager.at/api/v3/PublicHolidays"
 
-# 캐시 (API 호출 최소화)
+# Cache (minimize API calls)
 _cache = {}
 
 
@@ -39,11 +39,11 @@ def is_holiday(target_date: date, market: str) -> bool:
       - "US"
     """
 
-    # 주말
+    # Weekend
     if target_date.weekday() >= 5:
         return True
 
-    # 공휴일
+    # Public holiday
     holidays = _fetch_holidays(target_date.year, market)
 
     return target_date in holidays

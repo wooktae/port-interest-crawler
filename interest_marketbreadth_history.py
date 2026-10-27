@@ -1,7 +1,7 @@
-"""DB 가격 이력을 기반으로 market breadth 전체 이력을 재계산하는 backfill 스크립트다.
+"""Backfill script that recomputes the entire market breadth history based on the DB price history.
 
-PostgreSQL 가격 테이블을 장기간 조회해 일자별 breadth 지표를 만들고 저장한다.
-대량 DB 읽기/쓰기가 발생할 수 있으므로 실행 전 대상 범위와 upsert 정책을 확인한다.
+It queries the PostgreSQL price table over a long period to build per-date breadth metrics and save them.
+Large-scale DB reads/writes may occur, so confirm the target range and upsert policy before running.
 """
 
 import psycopg2

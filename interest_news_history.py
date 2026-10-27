@@ -1,7 +1,7 @@
-"""Naver 뉴스 검색 결과를 과거 기간 기준으로 backfill하는 스크립트다.
+"""Script that backfills Naver news search results over a past date range.
 
-날짜별 링크 수집과 기사 파싱을 병렬 처리하고 PostgreSQL에 저장한다.
-대량 외부 요청과 DB 쓰기가 발생할 수 있으므로 실행 전 기간과 요청 제한을 확인한다.
+It parallelizes per-date link collection and article parsing, and stores the results in PostgreSQL.
+Because it can trigger heavy external requests and DB writes, confirm the date range and request limits before running.
 """
 
 import requests
@@ -31,14 +31,14 @@ MAX_WORKERS = 8
 
 
 # ----------------------------
-# DB 연결
+# DB connection
 # ----------------------------
 def get_conn():
     return psycopg2.connect(**DB_CONFIG)
 
 
 # ----------------------------
-# 최근 N일 날짜 생성
+# Generate dates for the last N days
 # ----------------------------
 def get_dates(days=30):
 
@@ -50,7 +50,7 @@ def get_dates(days=30):
 
 
 # ----------------------------
-# 뉴스 링크 수집
+# Collect news links
 # ----------------------------
 def collect_links_for_date(date):
 
@@ -85,7 +85,7 @@ def collect_links_for_date(date):
 
         page_links = list(set(page_links))
 
-        # 새로운 링크만 필터
+        # Filter only the new links
         new_links = [l for l in page_links if l not in links]
 
         if not new_links:
@@ -105,7 +105,7 @@ def collect_links_for_date(date):
 
 
 # ----------------------------
-# 모바일 기사 URL 변환
+# Convert to mobile article URL
 # ----------------------------
 def to_mobile_url(url):
 
@@ -122,7 +122,7 @@ def to_mobile_url(url):
 
 
 # ----------------------------
-# 기사 파싱
+# Parse article
 # ----------------------------
 def parse_article(url):
 
@@ -190,7 +190,7 @@ def parse_article(url):
 
 
 # ----------------------------
-# DB 저장
+# Save to DB
 # ----------------------------
 def save_to_db(record):
 
@@ -252,7 +252,7 @@ def save_to_db(record):
 
 
 # ----------------------------
-# 기사 처리
+# Process article
 # ----------------------------
 def process_article(link):
 
@@ -275,7 +275,7 @@ def process_article(link):
 
 
 # ----------------------------
-# 실행
+# Run
 # ----------------------------
 def run():
 

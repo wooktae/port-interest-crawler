@@ -1,7 +1,7 @@
-"""Naver 증권 화면에서 시장별 stock universe 후보를 수집하는 Selenium 스크립트다.
+"""Selenium script that collects per-market stock universe candidates from Naver Finance screens.
 
-Chrome/ChromeDriver와 PostgreSQL 접속이 필요하며, 스크롤 기반 웹 수집 후 DB에 저장한다.
-실행 시 외부 웹 요청과 DB 쓰기가 발생하므로 운영 환경에서만 의도적으로 실행한다.
+It requires Chrome/ChromeDriver and a PostgreSQL connection, and stores results in the DB after scroll-based web collection.
+Because running it triggers external web requests and DB writes, run it intentionally only in the production environment.
 """
 
 from selenium import webdriver
@@ -15,7 +15,7 @@ import re
 from datetime import datetime
 
 # ----------------------------
-# DB 설정
+# DB settings
 # ----------------------------
 DB_CONFIG = get_db_config()
 
@@ -31,14 +31,14 @@ CODE_RE = re.compile(r"\b\d{6}\b")
 
 
 # ----------------------------
-# DB 연결
+# DB connection
 # ----------------------------
 def get_conn():
     return psycopg2.connect(**DB_CONFIG)
 
 
 # ----------------------------
-# driver 생성
+# Create driver
 # ----------------------------
 def create_driver():
 
@@ -54,7 +54,7 @@ def create_driver():
 
 
 # ----------------------------
-# 스크롤
+# Scroll
 # ----------------------------
 def initial_scroll(driver):
 
@@ -68,7 +68,7 @@ def initial_scroll(driver):
 
 
 # ----------------------------
-# 현재 종목 추출
+# Extract current stocks
 # ----------------------------
 def extract_stocks(driver):
 
@@ -96,7 +96,7 @@ def extract_stocks(driver):
 
 
 # ----------------------------
-# 더보기
+# Load more
 # ----------------------------
 def load_until(driver, target_count):
 
@@ -138,7 +138,7 @@ def crawl_index(driver, url, target_count):
 
 
 # ----------------------------
-# DB 저장
+# Save to DB
 # ----------------------------
 def save_to_db(ticker, name, market, universe):
 
@@ -171,7 +171,7 @@ def save_to_db(ticker, name, market, universe):
 
 
 # ----------------------------
-# 실행
+# Run
 # ----------------------------
 def run():
 

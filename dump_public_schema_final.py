@@ -1,13 +1,13 @@
-"""schema-per-domain 구조의 DDL과 샘플 데이터를 정리하는 로컬 점검 스크립트다.
+"""Local inspection script that consolidates the DDL and sample data of the schema-per-domain structure.
 
-pg_dump와 PostgreSQL 조회를 사용해 schema/table별 DDL, row count, sample data를
-하나의 텍스트 파일로 정리한다. 운영 수집 소스가 아니라 AWS Migration 전
-로컬 점검/문서화 후보 스크립트다.
+Using pg_dump and PostgreSQL queries, it consolidates the DDL, row count, and sample data
+per schema/table into a single text file. This is not an operational collection source but a
+local inspection/documentation candidate script prior to the AWS Migration.
 
-주의:
-- DB 읽기와 로컬 파일 생성만 수행한다.
-- 기본 대상은 portfolio DB의 schema-per-domain 전환 후 스키마다.
-- pg_dump 경로는 환경변수 PG_DUMP_PATH로 재정의할 수 있다.
+Notes:
+- Performs only DB reads and local file creation.
+- The default targets are the schemas after the schema-per-domain transition of the portfolio DB.
+- The pg_dump path can be overridden via the PG_DUMP_PATH environment variable.
 """
 
 import os
@@ -21,8 +21,8 @@ from psycopg2 import sql
 
 DB_CONFIG = get_db_config()
 
-# 2026-05 schema-per-domain 기준.
-# 필요하면 환경변수 DUMP_SCHEMAS="reference,interest,..." 로 실행 시 재정의 가능.
+# Based on the 2026-05 schema-per-domain layout.
+# If needed, this can be overridden at run time via the DUMP_SCHEMAS="reference,interest,..." environment variable.
 DEFAULT_SCHEMAS = [
     "reference",
     "interest",
@@ -68,7 +68,7 @@ def get_conn():
 
 
 def get_existing_schemas(conn):
-    """요청한 스키마 중 실제 DB에 존재하는 스키마만 반환한다."""
+    """Return only the schemas that actually exist in the DB among the requested schemas."""
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -83,7 +83,7 @@ def get_existing_schemas(conn):
 
 
 def get_tables(conn, schemas):
-    """schema-per-domain 기준으로 schema/table 목록을 반환한다."""
+    """Return the schema/table list based on the schema-per-domain layout."""
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -133,8 +133,8 @@ def get_row_count(conn, schema_name, table_name):
 
 def compact_text(text, max_blank_lines=1):
     """
-    연속된 공백줄을 max_blank_lines 개수만 남기고 줄인다.
-    기본값 1이면 빈 줄은 최대 1줄만 허용한다.
+    Reduce consecutive blank lines, keeping at most max_blank_lines of them.
+    With the default of 1, at most one blank line is allowed.
     """
     lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
 
@@ -155,8 +155,8 @@ def compact_text(text, max_blank_lines=1):
 
 def clean_pg_dump_ddl(text):
     """
-    pg_dump schema-only 결과에서 반복 헤더/푸터와 SET 옵션을 제거하고,
-    실제 CREATE/ALTER/INDEX/TRIGGER 중심 DDL만 남긴다.
+    Remove the repeated headers/footers and SET options from the pg_dump schema-only output,
+    keeping only the DDL centered on the actual CREATE/ALTER/INDEX/TRIGGER statements.
     """
     text = text.replace("\r\n", "\n").replace("\r", "\n")
 

@@ -1,7 +1,7 @@
-"""Naver 증권 리서치/증권사 의견 데이터를 과거 기간 기준으로 backfill하는 스크립트다.
+"""Script that backfills Naver Finance research / brokerage opinion data over a past date range.
 
-페이지 단위로 과거 리포트를 순회하고 상세 데이터를 파싱해 PostgreSQL에 저장한다.
-대량 외부 요청과 DB 쓰기가 발생할 수 있으므로 실행 전 기간과 중복 정책을 확인한다.
+It iterates through historical reports page by page, parses the detail data, and stores it in PostgreSQL.
+Because it can trigger heavy external requests and DB writes, confirm the date range and duplicate policy before running.
 """
 
 import requests
@@ -82,12 +82,12 @@ def format_seconds(sec: float):
 
 def load_universe_cache(conn):
     """
-    stock_universe 기준으로만 종목 매핑
+    Maps companies based on stock_universe only.
     company_name -> ticker_code
     """
     cur = conn.cursor()
 
-    # stock_universe에 company_name 컬럼이 있다고 가정
+    # Assumes stock_universe has a company_name column
     cur.execute("""
         SELECT ticker_code, company_name
         FROM stock_universe
@@ -116,8 +116,8 @@ def load_universe_cache(conn):
 
 def get_total_page_estimate(session: requests.Session):
     """
-    첫 페이지의 pageN 영역에서 마지막 페이지 숫자 추정
-    없으면 None
+    Estimates the last page number from the pageN area on the first page.
+    Returns None if it cannot be determined.
     """
     try:
         resp = session.get(LIST_URL.format(1), headers=HEADERS, timeout=10)
@@ -155,7 +155,7 @@ def get_nids_from_page(session: requests.Session, page: int):
         if m:
             nids.append(m.group(1))
 
-    # 중복 제거 + 순서 유지
+    # Remove duplicates while preserving order
     nids = list(dict.fromkeys(nids))
     return nids
 
@@ -245,7 +245,7 @@ def parse_detail(session: requests.Session, nid: str, ticker_cache: dict):
 
 def save_record(cur, record):
     """
-    stock_universe에 있는 종목만 저장
+    Saves only companies that exist in stock_universe.
     """
     if not record["ticker_code"]:
         return False

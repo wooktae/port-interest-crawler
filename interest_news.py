@@ -1,7 +1,7 @@
-"""Naver 뉴스 검색 결과를 일일 증분 수집하는 스크립트다.
+"""Script that incrementally collects Naver news search results on a daily basis.
 
-날짜별 뉴스 링크와 기사 본문을 요청/파싱하고 PostgreSQL에 저장한다.
-외부 웹 요청과 DB upsert가 포함되므로 운영 수집 단계에서만 실행한다.
+It requests and parses per-date news links and article bodies, and stores them in PostgreSQL.
+Because it involves external web requests and DB upserts, run it only during the production collection stage.
 """
 
 import requests
@@ -89,11 +89,11 @@ def collect_news_for_date(date):
             url = a.get("href")
             title = a.get_text(strip=True)
 
-            # 🔥 source
+            # source
             source_tag = li.select_one("span.writing")
             source = source_tag.get_text(strip=True) if source_tag else None
 
-            # 🔥 news_id 추출
+            # extract news_id
             m = re.search(r"/article/(\d+)/(\d+)", url)
             if not m:
                 continue
@@ -104,7 +104,7 @@ def collect_news_for_date(date):
             mobile_url = f"https://n.news.naver.com/mnews/article/{office}/{article}"
             news_id = article
 
-            # 🔥 published_at (완성형)
+            # published_at (finalized form)
             date_tag = li.select_one("span.date")
             published_at = None
 
@@ -113,22 +113,22 @@ def collect_news_for_date(date):
 
                 if raw_date:
                     try:
-                        # 분전
+                        # minutes ago
                         if "분전" in raw_date:
                             minutes = int(re.search(r"(\d+)분전", raw_date).group(1))
                             published_at = datetime.now() - timedelta(minutes=minutes)
 
-                        # 시간전
+                        # hours ago
                         elif "시간전" in raw_date:
                             hours = int(re.search(r"(\d+)시간전", raw_date).group(1))
                             published_at = datetime.now() - timedelta(hours=hours)
 
-                        # 🔥 일전 추가
+                        # days ago (added)
                         elif "일전" in raw_date:
                             days = int(re.search(r"(\d+)일전", raw_date).group(1))
                             published_at = datetime.now() - timedelta(days=days)
 
-                        # 절대시간
+                        # absolute time
                         else:
                             raw_date = raw_date.replace("오전", "AM").replace("오후", "PM")
                             published_at = datetime.strptime(raw_date, "%Y.%m.%d. %p %I:%M")
@@ -136,7 +136,7 @@ def collect_news_for_date(date):
                     except:
                         published_at = None
 
-            # fallback (선택)
+            # fallback (optional)
             if not published_at:
                 pass
 
@@ -161,7 +161,7 @@ def collect_news_for_date(date):
                 "source_version": SOURCE_VERSION
             })
 
-        # 🔥 다음 페이지 존재 여부로 종료
+        # stop based on whether the next page exists
         next_page = soup.select_one(f"div.paging a[href*='page={page+1}']")
         if not next_page:
             break
@@ -204,7 +204,7 @@ def parse_article(url):
         "news_id": news_id,
         "source": source,
         "title": title.strip(),
-        "content": None,   # 제목만 저장
+        "content": None,   # store title only
         "published_at": published_at,
         "url": url,
         "raw_json": json.dumps({
@@ -278,7 +278,7 @@ def save_to_db(conn, record):
 
 def run():
 
-    start_all = time.time()   # 🔥 추가
+    start_all = time.time()   # added
 
     conn = get_conn()
 
@@ -298,9 +298,9 @@ def run():
 
     for date in get_dates_range(start_date, end_date):
 
-        start_day = time.time()   # 🔥 추가
+        start_day = time.time()   # added
 
-        # 🔥 변경: 링크 → records
+        # changed: links -> records
         records = collect_news_for_date(date)
 
         saved = 0
@@ -327,16 +327,16 @@ def run():
                 f"{formatted_date} {saved} News Collected"
             )
 
-            elapsed_day = time.time() - start_day   # 🔥 추가
-            #print(f"[DONE] {formatted_date} | rows={saved} | {elapsed_day:.2f}s")   # 🔥 추가
+            elapsed_day = time.time() - start_day   # added
+            #print(f"[DONE] {formatted_date} | rows={saved} | {elapsed_day:.2f}s")   # added
 
     conn.close()
 
-    elapsed_all = time.time() - start_all   # 🔥 추가
-    #print(f"===== TOTAL DONE ({elapsed_all:.2f}s) =====")   # 🔥 추가
+    elapsed_all = time.time() - start_all   # added
+    #print(f"===== TOTAL DONE ({elapsed_all:.2f}s) =====")   # added
 
     # -----------------------------
-    # 결과 생성
+    # Build result
     # -----------------------------
     if not collected_dates:
         result = {

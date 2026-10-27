@@ -1,8 +1,8 @@
 # interest_log_format.py
-"""interest 수집 스크립트에서 사용하는 콘솔 로그 포맷 보조 모듈이다.
+"""Console log formatting helper module used by the interest collection scripts.
 
-단계별 성공/실패/수집일 요약과 일일 수집 summary 출력 형식을 통일한다.
-외부 요청이나 DB 접근은 없고, 다른 수집 모듈에서 출력 전용으로 호출한다.
+It unifies the output format for per-step success/failure/collected-date summaries and the daily collection summary.
+It has no external requests or DB access and is called by other collection modules for output only.
 """
 
 
@@ -71,7 +71,7 @@ def print_step_log(step_name: str, result: Dict):
 
     _print_header(step_name)
 
-    # 1. Collected Date (항상 출력)
+    # 1. Collected Date (always printed)
     _print_collected_dates(result.get("collected_dates"))
 
     # 2. Success

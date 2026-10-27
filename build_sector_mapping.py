@@ -1,7 +1,7 @@
-"""yfinance sector/industry 영문 값을 한국어 매핑 테이블에 보강하는 스크립트다.
+"""Script that enriches a Korean mapping table with the English yfinance sector/industry values.
 
-PostgreSQL에 접속해 universe 정보를 읽고, yfinance 외부 요청 결과를 mapping 테이블에 저장한다.
-실행 시 외부 네트워크와 DB upsert가 발생하므로 문서화 작업 중에는 실행하지 않는다.
+It connects to PostgreSQL, reads universe information, and stores the results of yfinance external requests in the mapping table.
+Because running it triggers external network access and DB upserts, do not run it during documentation work.
 """
 
 import psycopg2

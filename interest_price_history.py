@@ -1,7 +1,7 @@
-"""yfinance 기반 국내 관심종목 가격 데이터를 과거 기간 기준으로 backfill하는 스크립트다.
+"""Script that backfills yfinance-based domestic watchlist price data over a past period.
 
-DB universe를 읽고 종목별 장기 가격 이력을 조회해 PostgreSQL에 일괄 저장한다.
-대량 yfinance 요청과 DB 쓰기가 발생할 수 있으므로 실행 전 대상 범위를 확인한다.
+It reads the DB universe, queries the long-term price history per ticker, and saves it to PostgreSQL in bulk.
+Large-scale yfinance requests and DB writes may occur, so confirm the target range before running.
 """
 
 import yfinance as yf

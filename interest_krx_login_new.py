@@ -1,12 +1,12 @@
-"""KRX 웹 수집 전 로그인 상태를 준비하는 Selenium 보조 스크립트다.
+"""Selenium helper script that prepares the login state before KRX web collection.
 
-디버그 Chrome에 attach하거나 새 세션을 시작해 로그인 화면, iframe, 중복 로그인 팝업을 처리한다.
-계정 정보와 브라우저 상태에 의존하므로 운영 환경에서만 의도적으로 실행한다.
+It attaches to a debug Chrome instance or starts a new session and handles the login screen, iframe, and duplicate-login popup.
+Because it depends on account information and browser state, run it intentionally only in the production environment.
 
-운영 안전 기준:
-- 최종 로그인 상태가 확인된 경우에만 exit 0
-- 로그인 화면 / 점검 화면 / 업그레이드 화면 / Selenium 실패 / timeout은 exit non-zero
-- 콘솔 로그는 interest_log_format.print_step_log() 공통 포맷을 사용한다.
+Operational safety criteria:
+- Exit 0 only when the final logged-in state is confirmed.
+- The login screen / maintenance screen / upgrade screen / Selenium failure / timeout all exit with a non-zero code.
+- Console logs use the common interest_log_format.print_step_log() format.
 """
 
 import os
@@ -46,7 +46,7 @@ def pause(seconds):
 
 
 # ---------------------------
-# result 생성 / 출력
+# Build / print result
 # ---------------------------
 def build_result(status, success_lines=None, error_lines=None, failed_lines=None):
     return {
@@ -75,7 +75,7 @@ def attach_driver():
 
 
 # ---------------------------
-# chrome 실행
+# Launch chrome
 # ---------------------------
 def start_debug_chrome():
     subprocess.Popen(
@@ -89,7 +89,7 @@ def start_debug_chrome():
 
 
 # ---------------------------
-# driver 확보
+# Obtain driver
 # ---------------------------
 def get_driver():
     try:
@@ -100,7 +100,7 @@ def get_driver():
 
 
 # ---------------------------
-# 기본 대기
+# Basic wait
 # ---------------------------
 def wait_document_ready(driver, timeout=20):
     WebDriverWait(driver, timeout).until(
@@ -109,7 +109,7 @@ def wait_document_ready(driver, timeout=20):
 
 
 # ---------------------------
-# 브라우저 창 활성화 보정
+# Browser window activation adjustment
 # ---------------------------
 def activate_browser_window(driver):
     try:
@@ -131,7 +131,7 @@ def activate_browser_window(driver):
 
 
 # ---------------------------
-# KRX 점검 / 업그레이드 화면 감지
+# Detect KRX maintenance / upgrade screen
 # ---------------------------
 def read_page_text(driver, max_length=4000):
     try:
@@ -197,7 +197,7 @@ def assert_not_maintenance_page(driver, phase):
 
 
 # ---------------------------
-# 로그인 상태 체크
+# Check login state
 # ---------------------------
 def is_logged_in(driver):
     driver.switch_to.default_content()
@@ -235,12 +235,12 @@ def is_logged_in(driver):
 
 
 # ---------------------------
-# main window 정리
+# Clean up main window
 # ---------------------------
 def keep_only_main_window(driver):
     main = None
 
-    # 1) KRX 페이지 우선
+    # 1) Prefer the KRX page
     for handle in driver.window_handles:
         driver.switch_to.window(handle)
         url = driver.current_url
@@ -249,7 +249,7 @@ def keep_only_main_window(driver):
             main = handle
             break
 
-    # 2) new-tab 우선
+    # 2) Prefer the new-tab page
     if main is None:
         for handle in driver.window_handles:
             driver.switch_to.window(handle)
@@ -259,7 +259,7 @@ def keep_only_main_window(driver):
                 main = handle
                 break
 
-    # 3) http/https 페이지
+    # 3) http/https page
     if main is None:
         for handle in driver.window_handles:
             driver.switch_to.window(handle)
@@ -291,7 +291,7 @@ def keep_only_main_window(driver):
 
 
 # ---------------------------
-# 로그인 iframe 진입
+# Enter the login iframe
 # ---------------------------
 def switch_to_login_iframe(driver, timeout=20):
     driver.switch_to.default_content()
@@ -304,10 +304,10 @@ def switch_to_login_iframe(driver, timeout=20):
 
 
 # ---------------------------
-# KRX 알림 확인 버튼 처리
+# Handle KRX alert confirm button
 # ---------------------------
 def close_alert_if_exists(driver):
-    # 1) 브라우저 기본 alert
+    # 1) Browser native alert
     try:
         alert = driver.switch_to.alert
         alert.accept()
@@ -315,7 +315,7 @@ def close_alert_if_exists(driver):
     except Exception:
         pass
 
-    # 2) 현재 context 안의 일반 확인 버튼
+    # 2) A generic confirm button within the current context
     try:
         buttons = driver.find_elements(
             By.XPATH,
@@ -338,7 +338,7 @@ def close_alert_if_exists(driver):
 
 
 # ---------------------------
-# iframe 상태에서 로그인 폼 값 확인
+# Check login form values while in the iframe
 # ---------------------------
 def read_login_form_state(driver):
     return driver.execute_script(
@@ -357,7 +357,7 @@ def read_login_form_state(driver):
 
 
 # ---------------------------
-# 중복 로그인 confirm 처리
+# Handle duplicate-login confirm
 # ---------------------------
 def handle_duplicate_login_confirm_in_current_context(driver):
     try:
@@ -411,12 +411,12 @@ def handle_duplicate_login_confirm_in_current_context(driver):
 
 
 def handle_duplicate_login_confirm(driver):
-    # 1) 현재 context 우선
+    # 1) Prefer the current context
     if handle_duplicate_login_confirm_in_current_context(driver):
         pause(4)
         return True
 
-    # 2) default content에서 확인
+    # 2) Check in the default content
     try:
         driver.switch_to.default_content()
 
@@ -426,7 +426,7 @@ def handle_duplicate_login_confirm(driver):
     except Exception:
         pass
 
-    # 3) 다시 iframe 들어가서 확인
+    # 3) Re-enter the iframe and check
     try:
         switch_to_login_iframe(driver, timeout=5)
 
@@ -440,7 +440,7 @@ def handle_duplicate_login_confirm(driver):
 
 
 # ---------------------------
-# 로그인 후 결과 대기
+# Wait for the result after login
 # ---------------------------
 def wait_after_login_submit(driver):
     pause(1)
@@ -461,7 +461,7 @@ def wait_after_login_submit(driver):
 
 
 # ---------------------------
-# 입력 보정
+# Input value adjustment
 # ---------------------------
 def set_input_value_with_events(driver, selector, value):
     driver.execute_script(
@@ -488,7 +488,7 @@ def set_input_value_with_events(driver, selector, value):
 
 
 # ---------------------------
-# KRX 자체 로그인
+# KRX native login
 # ---------------------------
 def do_krx_login(driver):
     activate_browser_window(driver)
@@ -503,7 +503,7 @@ def do_krx_login(driver):
 
     wait = WebDriverWait(driver, 20)
 
-    # 1) 우측 상단 로그인 클릭
+    # 1) Click the login button at the top right
     login_btn = wait.until(
         EC.element_to_be_clickable(
             (By.XPATH, "//a[.//img[@title='로그인']]")
@@ -520,12 +520,12 @@ def do_krx_login(driver):
     pause(2)
     assert_not_maintenance_page(driver, phase="after login button click")
 
-    # 2) 로그인 iframe 진입
+    # 2) Enter the login iframe
     switch_to_login_iframe(driver, timeout=20)
 
     pause(2)
 
-    # 3) 아이디 입력
+    # 3) Enter the ID
     id_input = wait.until(
         EC.visibility_of_element_located(
             (By.ID, "mbrId")
@@ -551,7 +551,7 @@ def do_krx_login(driver):
     form_state = read_login_form_state(driver)
     debug(f"after id input = {form_state}")
 
-    # 4) 비밀번호 입력
+    # 4) Enter the password
     pw_input = wait.until(
         EC.visibility_of_element_located(
             (By.NAME, "pw")
@@ -576,7 +576,7 @@ def do_krx_login(driver):
     form_state = read_login_form_state(driver)
     debug(f"after password send_keys = {form_state}")
 
-    # KRX 키보드보안 필드에서 Selenium send_keys 값이 실제 value에 안 잡히는 경우 보정
+    # Fallback for when the Selenium send_keys value is not captured in the actual value of the KRX keyboard-security field
     if form_state.get("pwLen", 0) == 0:
         set_input_value_with_events(driver, 'input[name="pw"]', KRX_USER_PASSWORD)
 
@@ -585,7 +585,7 @@ def do_krx_login(driver):
         form_state = read_login_form_state(driver)
         debug(f"after password fallback = {form_state}")
 
-    # 키보드보안 focusout 유도
+    # Trigger keyboard-security focusout
     try:
         driver.execute_script(
             """
@@ -615,7 +615,7 @@ def do_krx_login(driver):
     if form_state.get("pwLen", 0) == 0:
         raise Exception("비밀번호 값이 브라우저 폼에 들어가지 않았어.")
 
-    # 5) 로그인 버튼 클릭
+    # 5) Click the login submit button
     submit_btn = wait.until(
         EC.element_to_be_clickable(
             (By.CSS_SELECTOR, "a.jsLoginBtn")
@@ -629,10 +629,10 @@ def do_krx_login(driver):
     pause(0.3)
     driver.execute_script("arguments[0].click();", submit_btn)
 
-    # 6) 로그인 결과/중복 로그인 팝업 처리
+    # 6) Handle the login result / duplicate-login popup
     wait_after_login_submit(driver)
 
-    # 7) 기본 페이지 복귀 후 최종 확인
+    # 7) Return to the default page and perform the final check
     driver.switch_to.default_content()
 
     assert_not_maintenance_page(driver, phase="after login submit")
@@ -661,7 +661,7 @@ def run():
 
         pause(2)
 
-        # 분기 1: 이미 로그인된 상태
+        # Branch 1: already logged in
         if is_logged_in(driver):
             elapsed = (datetime.now() - start).total_seconds()
 
@@ -676,7 +676,7 @@ def run():
             print_result(result)
             return result
 
-        # 분기 2: 로그인 안 된 상태
+        # Branch 2: not logged in
         login_confirmed = do_krx_login(driver)
 
         elapsed = (datetime.now() - start).total_seconds()

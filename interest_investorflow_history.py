@@ -1,7 +1,7 @@
-"""Naver 금융의 종목별 투자자 수급 데이터를 과거 기간 기준으로 backfill하는 스크립트다.
+"""Script that backfills per-ticker investor flow data from Naver Finance over a past date range.
 
-종목별 전체 페이지를 순회해 투자자 수급 이력을 파싱하고 PostgreSQL에 저장한다.
-대량 웹 요청과 DB 쓰기가 발생할 수 있으므로 실행 전 대상 universe와 제한을 확인한다.
+It iterates through all pages per ticker, parses the investor flow history, and stores it in PostgreSQL.
+Because it can trigger heavy web requests and DB writes, confirm the target universe and limits before running.
 """
 
 import requests
@@ -150,7 +150,7 @@ def get_last_page(session, ticker):
         if m:
             return int(m.group(1))
 
-    # 마지막 페이지 링크가 없으면 1페이지뿐인 경우
+    # If there is no last-page link, there is only a single page
     return 1
 
 
@@ -268,7 +268,7 @@ def crawl_ticker(ticker, company):
             save_batch(cur, ticker, rows)
             total += len(rows)
 
-            # 네이버 서버 부하/차단 방지
+            # Avoid overloading or getting blocked by the Naver server
             time.sleep(0.15)
 
         conn.commit()

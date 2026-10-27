@@ -1,7 +1,7 @@
-"""yfinance 기반 원자재 가격 데이터를 과거 기간 기준으로 backfill하는 스크립트다.
+"""Script that backfills yfinance-based commodity price data over a past period.
 
-정의된 원자재 ticker의 장기 가격 이력을 조회해 PostgreSQL history/raw 계열 테이블에 저장한다.
-대량 yfinance 요청과 DB 쓰기가 발생할 수 있으므로 실행 전 대상 범위를 확인한다.
+It queries the long-term price history of the defined commodity tickers and saves it to the PostgreSQL history/raw family of tables.
+Large-scale yfinance requests and DB writes may occur, so confirm the target range before running.
 """
 
 import yfinance as yf

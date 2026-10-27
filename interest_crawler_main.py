@@ -1,7 +1,7 @@
-"""관심 데이터 주요 수집 모듈을 수동으로 순차 실행하는 orchestration 후보 스크립트다.
+"""Orchestration candidate script that manually runs the main interest data collection modules in sequence.
 
-ticker, 뉴스, 리서치, 해외지수, 원자재, 매크로, market breadth 수집을 호출한다.
-외부 요청과 DB 쓰기가 포함되므로 실제 실행 전 대상 모듈과 환경변수를 확인한다.
+It calls the collection of ticker, news, research, foreign indices, commodities, macro, and market breadth.
+Because it includes external requests and DB writes, confirm the target modules and environment variables before actually running.
 """
 
 import interest_ticker_main
@@ -16,7 +16,7 @@ import interest_marketbreadth
 
 
 def run():
-    """주요 수집 모듈의 run 함수를 순서대로 호출한다."""
+    """Call the run functions of the main collection modules in order."""
 
     print("=================================")
     print("INTEREST CRAWLER START")

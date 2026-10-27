@@ -1,7 +1,7 @@
-"""yfinance 기반 국내 관심종목 가격 데이터를 일일 증분 수집하는 스크립트다.
+"""Script that collects yfinance-based domestic watchlist price data as daily increments.
 
-DB universe를 읽고 시장별 yfinance ticker로 변환한 뒤 최신 영업일 가격을 저장한다.
-yfinance 외부 요청과 DB upsert가 포함되므로 운영 수집 단계에서만 실행한다.
+It reads the DB universe, converts it to per-market yfinance tickers, and saves the latest business-day prices.
+Because it includes yfinance external requests and DB upserts, run it only in the operational collection step.
 """
 
 import yfinance as yf
@@ -281,18 +281,18 @@ def run():
 
     try:
 
-        # 1️⃣ 최신 영업일
+        # 1️⃣ latest business day
         latest_business_day = get_latest_business_day()
 
         for code, market in universe:
 
             latest = get_latest_date(conn, code)
 
-            # 최신이면 PASS
+            # PASS if already up to date
             if latest == latest_business_day:
                 continue
 
-            # 🔥 range 복구
+            # 🔥 restore range
             if latest:
                 start = latest + timedelta(days=1)
             else:
@@ -329,7 +329,7 @@ def run():
         conn.close()
 
         # -------------------
-        # 결과 처리
+        # Result handling
         # -------------------
 
         if not collected_dates:
