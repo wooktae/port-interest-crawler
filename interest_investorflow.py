@@ -9,6 +9,7 @@ production collection stage.
 
 import time
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import psycopg2
 import requests
@@ -22,18 +23,16 @@ DB_CONFIG = get_db_config()
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0",
-    "Referer": "https://stock.naver.com/",
+    "Referer": "https://m.stock.naver.com/",
     "Accept": "application/json, text/plain, */*",
 }
 
 SOURCE = "naver"
-SOURCE_VERSION = "3.0.0"
+SOURCE_VERSION = "3.1.0"
+KST = ZoneInfo("Asia/Seoul")
+MAX_PAGES_PER_TICKER = 100
 
-API_URL = (
-    "https://stock.naver.com/api/domestic/detail/"
-    "{ticker}/trend"
-    "?tradeType=KRX&startIdx=0&pageSize=50"
-)
+API_URL = "https://m.stock.naver.com/front-api/stock/domestic/trend"
 
 
 def get_conn():
@@ -79,11 +78,11 @@ def generate_dates(conn):
     cur.close()
 
     if row[0] is None:
-        start = datetime.now().date() - timedelta(days=10)
+        start = datetime.now(KST).date() - timedelta(days=10)
     else:
         start = row[0] + timedelta(days=1)
 
-    end = datetime.now().date() - timedelta(days=1)
+    end = datetime.now(KST).date() - timedelta(days=1)
 
     dates = []
 
@@ -137,80 +136,131 @@ def calculate_change_rate(close_price, price_diff):
 
 
 def parse_item(item):
-    bizdate = item.get("bizdate")
+    """Normalize the Naver mobile KRX payload to the existing DB contract."""
+    if not isinstance(item, dict):
+        return None
 
-    if not bizdate:
+    date_str = item.get("localTradedAt")
+    krx = item.get("krx")
+    if not date_str or not isinstance(krx, dict):
         return None
 
     try:
-        trade_date = datetime.strptime(
-            bizdate,
-            "%Y%m%d"
-        ).date()
+        trade_date = datetime.strptime(date_str, "%Y-%m-%d").date()
     except (TypeError, ValueError):
         return None
 
-    close_price = to_int(item.get("closePrice"))
-    price_diff = to_int(item.get("prevChangePrice"))
+    close_price = to_int(krx.get("closingPrice"))
+    price_diff = to_int(krx.get("changePrice"))
+    volume = to_int(krx.get("tradingVolume"))
+    institution_net = to_int(krx.get("organizationNetVolume"))
+    foreign_net = to_int(krx.get("foreignNetVolume"))
+    foreign_hold_shares = to_int(item.get("foreignHoldingStockQuantity"))
+    foreign_hold_ratio = to_float(item.get("foreignHoldingRatio"))
+
+    # Reject incomplete market records instead of silently saving NULL signals.
+    required = (close_price, price_diff, volume, institution_net,
+                foreign_net, foreign_hold_shares, foreign_hold_ratio)
+    if any(value is None for value in required):
+        raise ValueError(f"Incomplete KRX investor-flow fields for date={date_str}")
 
     return {
         "trade_date": trade_date,
         "close_price": close_price,
         "price_diff": price_diff,
-        "price_change_rate": calculate_change_rate(
-            close_price,
-            price_diff
-        ),
-        "volume": to_int(
-            item.get("tradeVolume")
-        ),
-        "institution_net": to_int(
-            item.get("organPureBuyQuant")
-        ),
-        "foreign_net": to_int(
-            item.get("foreignerPureBuyQuant")
-        ),
-        "foreign_hold_shares": to_int(
-            item.get("frgnStock")
-        ),
-        "foreign_hold_ratio": to_float(
-            item.get("frgnHoldRatio")
-        ),
+        "price_change_rate": calculate_change_rate(close_price, price_diff),
+        "volume": volume,
+        "institution_net": institution_net,
+        "foreign_net": foreign_net,
+        "foreign_hold_shares": foreign_hold_shares,
+        "foreign_hold_ratio": foreign_hold_ratio,
     }
 
 
-def fetch_rows(session, ticker):
-    url = API_URL.format(ticker=ticker)
+def fetch_rows(session, ticker, needed_dates=None):
+    """Read cursor pages until requested dates are found or history ends.
 
-    response = session.get(
-        url,
-        headers=HEADERS,
-        timeout=(5, 10)
-    )
+    Without needed_dates, return only the newest API page (read-only probe).
+    With needed_dates, page backward only until the requested window is covered
+    or has been passed. The cursor is opaque; never decode or compute it.
+    """
+    params = {"code": ticker}
+    cursor = None
+    seen_cursors = set()
+    records_by_date = {}
+    required_dates = set(needed_dates) if needed_dates is not None else None
+    if required_dates is not None and not required_dates:
+        return []
 
-    response.raise_for_status()
+    for page in range(1, MAX_PAGES_PER_TICKER + 1):
+        if cursor is not None:
+            params["cursor"] = cursor
 
-    payload = response.json()
+        response = session.get(
+            API_URL, params=params, headers=HEADERS, timeout=(5, 10)
+        )
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as exc:
+            raise requests.HTTPError(
+                f"Naver InvestorFlow HTTP error: ticker={ticker}, "
+                f"page={page}, status={response.status_code}, "
+                f"url={response.url}"
+            ) from exc
 
-    if not isinstance(payload, list):
-        raise ValueError(
-            f"Unexpected Naver investor flow response "
-            f"for ticker={ticker}: "
-            f"type={type(payload).__name__}"
+        payload = response.json()
+        if not isinstance(payload, dict) or payload.get("isSuccess") is not True:
+            raise ValueError(
+                f"Naver InvestorFlow API rejected ticker={ticker}, page={page}: "
+                f"{str(payload)[:250]}"
+            )
+
+        result = payload.get("result")
+        if not isinstance(result, dict) or not isinstance(result.get("items"), list):
+            raise ValueError(f"Invalid InvestorFlow response: ticker={ticker}, page={page}")
+
+        items = result["items"]
+        if not items:
+            if result.get("hasNext"):
+                raise ValueError(f"Empty InvestorFlow page with hasNext: ticker={ticker}")
+            break
+
+        for item in items:
+            record = parse_item(item)
+            if record is not None:
+                records_by_date[record["trade_date"]] = record
+
+        # A standalone read without a date window is intentionally bounded to
+        # one page. Full historical collection must supply needed_dates.
+        if required_dates is None:
+            break
+
+        if required_dates.issubset(records_by_date):
+            break
+
+        # All later pages should be older. Once the oldest known date is before
+        # the earliest requested date, pagination cannot fill later missing rows.
+        if required_dates and records_by_date:
+            if min(records_by_date) < min(required_dates):
+                break
+
+        if result.get("hasNext") is not True:
+            break
+
+        next_cursor = result.get("cursor")
+        if not isinstance(next_cursor, str) or not next_cursor or next_cursor in seen_cursors:
+            raise ValueError(f"Invalid/repeated InvestorFlow cursor: ticker={ticker}, page={page}")
+        seen_cursors.add(next_cursor)
+        cursor = next_cursor
+        time.sleep(0.05)
+    else:
+        raise RuntimeError(
+            f"InvestorFlow exceeded {MAX_PAGES_PER_TICKER} pages: ticker={ticker}"
         )
 
-    records = []
-
-    for item in payload:
-        if not isinstance(item, dict):
-            continue
-
-        record = parse_item(item)
-
-        if record:
-            records.append(record)
-
-    return records
+    # A newly listed/halted ticker may lack some historical dates. We return
+    # available records, and the caller reports coverage rather than forging rows.
+    return [records_by_date[d] for d in sorted(records_by_date)]
 
 
 def save_batch(cur, ticker, records):
@@ -256,6 +306,8 @@ def save_batch(cur, ticker, records):
                 foreign_net = EXCLUDED.foreign_net,
                 foreign_hold_shares = EXCLUDED.foreign_hold_shares,
                 foreign_hold_ratio = EXCLUDED.foreign_hold_ratio,
+                source = EXCLUDED.source,
+                source_version = EXCLUDED.source_version,
                 updated_at = now()
         """, {
             "ticker": ticker,
@@ -339,7 +391,8 @@ def run():
 
             rows = fetch_rows(
                 session,
-                ticker
+                ticker,
+                needed_dates=needed_dates,
             )
 
             target_rows = [
@@ -409,7 +462,7 @@ def run():
             "success_lines": [],
             "error_lines": [],
             "failed_lines": [str(e)],
-            "error_count": 0
+            "error_count": 1
         }
 
         print_step_log(
