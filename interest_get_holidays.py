@@ -7,7 +7,7 @@ Because it includes external API requests, there is a network impact when the ca
 import requests
 from datetime import datetime, date
 
-HOLIDAY_API_BASE = "https://date.nager.at/api/v3/PublicHolidays"
+HOLIDAY_API_BASE = "https://nagerholidays.com/api/v4/Holidays"
 
 # Cache (minimize API calls)
 _cache = {}
@@ -19,8 +19,15 @@ def _fetch_holidays(year: int, country_code: str):
     if key in _cache:
         return _cache[key]
 
-    url = f"{HOLIDAY_API_BASE}/{year}/{country_code}"
-    resp = requests.get(url, timeout=10)
+    url = f"{HOLIDAY_API_BASE}/{country_code}/{year}"
+    resp = requests.get(
+        url,
+        headers={
+            "User-Agent": "PortfolioHolidayChecker/1.0",
+            "Accept": "application/json",
+        },
+        timeout=10,
+    )
     resp.raise_for_status()
 
     holidays = {
